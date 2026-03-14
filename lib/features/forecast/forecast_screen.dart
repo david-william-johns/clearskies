@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import '../../models/celestial_event.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/mini_calendar.dart';
+import '../../widgets/celestial_events_column.dart';
+import '../../widgets/history_panel.dart';
 import '../location/location_search_screen.dart';
-import 'celestial_events_bar.dart';
 import 'forecast_providers.dart';
 import 'day_forecast_tile.dart';
 
@@ -38,9 +38,10 @@ class _ForecastBody extends ConsumerWidget {
     final forecastAsync = ref.watch(forecastProvider(location));
     final celestialAsync = ref.watch(celestialEventsProvider(location));
     final celestialEvents = celestialAsync.valueOrNull ?? [];
-    final orbitalEvents = celestialEvents
-        .where((e) => e.type == CelestialEventType.orbital)
-        .toList();
+
+    final screenWidth = MediaQuery.of(context).size.width;
+    final leftWidth = screenWidth < 600 ? 145.0 : 185.0;
+    final showHistory = screenWidth >= 800;
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -50,10 +51,10 @@ class _ForecastBody extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
-              children: [
-                const Icon(Icons.stars, color: AppColors.primary, size: 16),
-                const SizedBox(width: 6),
-                const Text(
+              children: const [
+                Icon(Icons.stars, color: AppColors.primary, size: 16),
+                SizedBox(width: 6),
+                Text(
                   'ClearSkies',
                   style: TextStyle(
                     color: AppColors.primary,
@@ -87,24 +88,29 @@ class _ForecastBody extends ConsumerWidget {
           IconButton(
             icon: const Icon(Icons.refresh, color: AppColors.textSecondary),
             tooltip: 'Refresh',
-            onPressed: () =>
-                ref.invalidate(forecastProvider(location)),
+            onPressed: () => ref.invalidate(forecastProvider(location)),
           ),
         ],
       ),
       body: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Left panel: sticky mini calendar
-          Container(
-            width: 155,
-            color: Colors.transparent,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(8, 14, 4, 0),
-              child: MiniCalendar(orbitalEvents: orbitalEvents),
+          // ── Left panel: 2-month calendar + celestial events ──────────────
+          SizedBox(
+            width: leftWidth,
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(8, 14, 4, 14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  MiniCalendar(allEvents: celestialEvents),
+                  CelestialEventsColumn(events: celestialEvents),
+                ],
+              ),
             ),
           ),
-          // Right panel: scrolling forecast list
+
+          // ── Centre panel: forecast tiles ─────────────────────────────────
           Expanded(
             child: forecastAsync.when(
               loading: () => const Center(
@@ -112,11 +118,12 @@ class _ForecastBody extends ConsumerWidget {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     CircularProgressIndicator(
-                        valueColor:
-                            AlwaysStoppedAnimation<Color>(AppColors.primary)),
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                            AppColors.primary)),
                     SizedBox(height: 16),
                     Text('Fetching sky conditions…',
-                        style: TextStyle(color: AppColors.textSecondary)),
+                        style:
+                            TextStyle(color: AppColors.textSecondary)),
                   ],
                 ),
               ),
@@ -166,7 +173,6 @@ class _ForecastBody extends ConsumerWidget {
                     physics: const AlwaysScrollableScrollPhysics(),
                     children: [
                       _LegendBar(),
-                      CelestialEventsBar(events: celestialEvents),
                       const SizedBox(height: 4),
                       ...forecasts.asMap().entries.map((e) {
                         final isToday = e.key == 0;
@@ -188,6 +194,15 @@ class _ForecastBody extends ConsumerWidget {
               },
             ),
           ),
+
+          // ── Right panel: This Day in History ─────────────────────────────
+          if (showHistory)
+            SizedBox(
+              width: 220,
+              child: SingleChildScrollView(
+                child: const HistoryPanel(),
+              ),
+            ),
         ],
       ),
     );
@@ -232,7 +247,8 @@ class _Legend extends StatelessWidget {
           Container(
               width: 6,
               height: 6,
-              decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+              decoration:
+                  BoxDecoration(color: color, shape: BoxShape.circle)),
           const SizedBox(width: 3),
           Text(label,
               style: const TextStyle(
@@ -253,14 +269,15 @@ class _Footer extends StatelessWidget {
       child: Text(
         'Weather: Open-Meteo · Seeing: 7timer.info · Astronomy: computed\n'
         'Scores weighted: cloud 40% · seeing 25% · transparency 20% · moon 10% · humidity 3% · wind 2%',
-        style: TextStyle(color: AppColors.textMuted, fontSize: 9, height: 1.6),
+        style:
+            TextStyle(color: AppColors.textMuted, fontSize: 9, height: 1.6),
         textAlign: TextAlign.center,
       ),
     );
   }
 }
 
-// ─── Scaffolds for edge states ────────────────────────────────────────────────
+// ─── Edge-state scaffolds ─────────────────────────────────────────────────────
 
 class _LoadingScaffold extends StatelessWidget {
   const _LoadingScaffold();
@@ -271,7 +288,8 @@ class _LoadingScaffold extends StatelessWidget {
       backgroundColor: Colors.transparent,
       body: Center(
         child: CircularProgressIndicator(
-            valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary)),
+            valueColor:
+                AlwaysStoppedAnimation<Color>(AppColors.primary)),
       ),
     );
   }

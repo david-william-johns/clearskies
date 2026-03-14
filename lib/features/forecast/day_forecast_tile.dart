@@ -5,6 +5,7 @@ import 'package:fl_chart/fl_chart.dart';
 import '../../models/day_forecast.dart';
 import '../../models/hourly_slot.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/night_weather_icon.dart';
 import 'clear_sky_score_badge.dart';
 import 'hourly_conditions_grid.dart';
 
@@ -203,7 +204,12 @@ class _CollapsedHeader extends StatelessWidget {
             ],
           ),
 
-          const SizedBox(width: 10),
+          const SizedBox(width: 8),
+
+          // Night weather animation
+          NightWeatherIcon(forecast: f),
+
+          const SizedBox(width: 8),
 
           // Score badge + chevron
           Column(

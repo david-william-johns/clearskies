@@ -3,36 +3,42 @@ import 'package:intl/intl.dart';
 import '../models/celestial_event.dart';
 import '../theme/app_theme.dart';
 
-/// A compact monthly calendar, week starts Monday (ISO), for the left panel.
-/// Pass [orbitalEvents] to show indicator dots on event dates.
+/// A compact two-month calendar (current + next) for the left panel.
+/// Pass [allEvents] to show colour-coded indicator dots on event dates.
 class MiniCalendar extends StatelessWidget {
-  final List<CelestialEvent> orbitalEvents;
+  final List<CelestialEvent> allEvents;
 
-  const MiniCalendar({super.key, this.orbitalEvents = const []});
+  const MiniCalendar({super.key, this.allEvents = const []});
 
   @override
   Widget build(BuildContext context) {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
 
-    // Build a set of dates that have orbital events (for O(1) lookup)
-    final eventDates = <DateTime, String>{};
-    for (final e in orbitalEvents) {
+    // Build map from date → event type (first event wins for dot colour)
+    final eventDates = <DateTime, CelestialEventType>{};
+    for (final e in allEvents) {
       final d = DateTime(e.date.year, e.date.month, e.date.day);
-      eventDates[d] = e.name;
+      eventDates.putIfAbsent(d, () => e.type);
     }
+
+    // Next month
+    final nextMonth = DateTime(now.year, now.month + 1, 1);
 
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _Header(now: now),
-        const SizedBox(height: 6),
-        _WeekdayRow(),
-        const SizedBox(height: 2),
-        _DaysGrid(
+        _MonthGrid(
           year: now.year,
           month: now.month,
+          today: today,
+          eventDates: eventDates,
+        ),
+        const SizedBox(height: 14),
+        _MonthGrid(
+          year: nextMonth.year,
+          month: nextMonth.month,
           today: today,
           eventDates: eventDates,
         ),
@@ -41,28 +47,54 @@ class MiniCalendar extends StatelessWidget {
   }
 }
 
-// ─── Header ───────────────────────────────────────────────────────────────────
+// ─── Single month grid ────────────────────────────────────────────────────────
 
-class _Header extends StatelessWidget {
-  final DateTime now;
-  const _Header({required this.now});
+class _MonthGrid extends StatelessWidget {
+  final int year;
+  final int month;
+  final DateTime today;
+  final Map<DateTime, CelestialEventType> eventDates;
+
+  const _MonthGrid({
+    required this.year,
+    required this.month,
+    required this.today,
+    required this.eventDates,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Text(
-      DateFormat('MMMM yyyy').format(now),
-      style: const TextStyle(
-        color: AppColors.textSecondary,
-        fontSize: 11,
-        fontWeight: FontWeight.w600,
-        letterSpacing: 0.4,
-      ),
-      textAlign: TextAlign.center,
+    final monthDate = DateTime(year, month, 1);
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Month + year header
+        Text(
+          DateFormat('MMMM yyyy').format(monthDate),
+          style: const TextStyle(
+            color: AppColors.textSecondary,
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.4,
+          ),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 5),
+        _WeekdayRow(),
+        const SizedBox(height: 2),
+        _DaysGrid(
+          year: year,
+          month: month,
+          today: today,
+          eventDates: eventDates,
+        ),
+      ],
     );
   }
 }
 
-// ─── Weekday row: M T W T F S S ──────────────────────────────────────────────
+// ─── Weekday row ──────────────────────────────────────────────────────────────
 
 class _WeekdayRow extends StatelessWidget {
   static const _labels = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
@@ -73,7 +105,7 @@ class _WeekdayRow extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.spaceAround,
       children: _labels
           .map((l) => SizedBox(
-                width: 18,
+                width: 20,
                 child: Text(
                   l,
                   style: const TextStyle(
@@ -95,7 +127,7 @@ class _DaysGrid extends StatelessWidget {
   final int year;
   final int month;
   final DateTime today;
-  final Map<DateTime, String> eventDates;
+  final Map<DateTime, CelestialEventType> eventDates;
 
   const _DaysGrid({
     required this.year,
@@ -106,7 +138,7 @@ class _DaysGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final firstWeekday = DateTime(year, month, 1).weekday; // 1=Mon, 7=Sun
+    final firstWeekday = DateTime(year, month, 1).weekday; // 1=Mon
     final leadingBlanks = firstWeekday - 1;
     final daysInMonth = DateUtils.getDaysInMonth(year, month);
 
@@ -114,10 +146,7 @@ class _DaysGrid extends StatelessWidget {
       ...List<int?>.filled(leadingBlanks, null),
       ...List<int?>.generate(daysInMonth, (i) => i + 1),
     ];
-
-    while (cells.length % 7 != 0) {
-      cells.add(null);
-    }
+    while (cells.length % 7 != 0) { cells.add(null); }
 
     final weeks = <List<int?>>[];
     for (var i = 0; i < cells.length; i += 7) {
@@ -143,7 +172,7 @@ class _WeekRow extends StatelessWidget {
   final int year;
   final int month;
   final DateTime today;
-  final Map<DateTime, String> eventDates;
+  final Map<DateTime, CelestialEventType> eventDates;
 
   const _WeekRow({
     required this.week,
@@ -153,18 +182,31 @@ class _WeekRow extends StatelessWidget {
     required this.eventDates,
   });
 
+  Color _dotColor(CelestialEventType type) {
+    switch (type) {
+      case CelestialEventType.meteorShower:
+        return const Color(0xFFFFAB40);
+      case CelestialEventType.aurora:
+        return const Color(0xFF00E676);
+      case CelestialEventType.planet:
+        return AppColors.primary;
+      case CelestialEventType.moon:
+        return AppColors.moonGold;
+      case CelestialEventType.orbital:
+        return AppColors.textSecondary;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceAround,
       children: week.map((day) {
-        if (day == null) {
-          return const SizedBox(width: 18, height: 22);
-        }
+        if (day == null) return const SizedBox(width: 20, height: 22);
+
         final date = DateTime(year, month, day);
         final isToday = date == today;
-        final eventName = eventDates[date];
-        final hasEvent = eventName != null;
+        final eventType = eventDates[date];
 
         Widget dayCell = isToday
             ? Container(
@@ -198,20 +240,19 @@ class _WeekRow extends StatelessWidget {
                 ),
               );
 
-        // Stack with optional event dot below
         Widget cell = SizedBox(
-          width: 18,
+          width: 20,
           height: 22,
           child: Column(
             mainAxisAlignment: MainAxisAlignment.start,
             children: [
               dayCell,
-              if (hasEvent)
+              if (eventType != null)
                 Container(
                   width: 4,
                   height: 4,
-                  decoration: const BoxDecoration(
-                    color: AppColors.primary,
+                  decoration: BoxDecoration(
+                    color: _dotColor(eventType),
                     shape: BoxShape.circle,
                   ),
                 )
@@ -221,9 +262,13 @@ class _WeekRow extends StatelessWidget {
           ),
         );
 
-        if (hasEvent) {
+        if (eventType != null) {
+          final eventName = eventDates.keys
+              .where((k) => k == date)
+              .map((_) => eventType.name)
+              .firstOrNull;
           cell = Tooltip(
-            message: eventName,
+            message: eventName ?? eventType.name,
             child: cell,
           );
         }
