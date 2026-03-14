@@ -1,0 +1,228 @@
+import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import '../../models/hourly_slot.dart';
+import '../../theme/app_theme.dart';
+
+class HourlyConditionsGrid extends StatelessWidget {
+  final List<HourlySlot> slots;
+
+  const HourlyConditionsGrid({super.key, required this.slots});
+
+  @override
+  Widget build(BuildContext context) {
+    if (slots.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 12),
+        child: Text(
+          'No dark hours available for this date.',
+          style: TextStyle(color: AppColors.textMuted),
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Header row
+        _HeaderRow(),
+        const SizedBox(height: 4),
+        const Divider(height: 1),
+        const SizedBox(height: 4),
+        // Data rows
+        ...slots.map((s) => _SlotRow(slot: s)),
+      ],
+    );
+  }
+}
+
+class _HeaderRow extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return const Row(
+      children: [
+        _Cell('TIME', flex: 2, header: true),
+        _Cell('CLOUD', flex: 2, header: true),
+        _Cell('SEEING', flex: 2, header: true),
+        _Cell('TRANS', flex: 2, header: true),
+        _Cell('HUM', flex: 1, header: true),
+        _Cell('WIND', flex: 2, header: true),
+        _Cell('SCORE', flex: 2, header: true),
+      ],
+    );
+  }
+}
+
+class _SlotRow extends StatelessWidget {
+  final HourlySlot slot;
+  const _SlotRow({required this.slot});
+
+  @override
+  Widget build(BuildContext context) {
+    final score = slot.clearSkyScore;
+    final scoreColor = AppColors.scoreColor(score);
+    final timeStr = DateFormat('HH:mm').format(slot.time.toLocal());
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Row(
+        children: [
+          // Time
+          _Cell(timeStr, flex: 2),
+          // Cloud cover bar
+          Expanded(
+            flex: 2,
+            child: _CloudBar(pct: slot.cloudCoverTotal),
+          ),
+          // Seeing dots
+          Expanded(
+            flex: 2,
+            child: _DotRating(value: slot.seeing, max: 5),
+          ),
+          // Transparency dots
+          Expanded(
+            flex: 2,
+            child: _DotRating(value: slot.transparency, max: 5),
+          ),
+          // Humidity
+          _Cell(
+            '${slot.humidity}%',
+            flex: 1,
+            color: slot.isDewRisk ? AppColors.scoreAmber : AppColors.textSecondary,
+          ),
+          // Wind
+          _Cell(
+            '${slot.windSpeedKnots.round()}kn',
+            flex: 2,
+            color: slot.isWindy ? AppColors.scoreAmber : AppColors.textSecondary,
+          ),
+          // Score
+          Expanded(
+            flex: 2,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+              decoration: BoxDecoration(
+                color: scoreColor.withAlpha(25),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(
+                '$score',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: scoreColor,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Cell extends StatelessWidget {
+  final String text;
+  final int flex;
+  final bool header;
+  final Color? color;
+
+  const _Cell(this.text, {required this.flex, this.header = false, this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      flex: flex,
+      child: Text(
+        text,
+        textAlign: TextAlign.center,
+        style: TextStyle(
+          color: header
+              ? AppColors.textMuted
+              : (color ?? AppColors.textSecondary),
+          fontSize: header ? 9 : 11,
+          fontWeight: header ? FontWeight.w600 : FontWeight.normal,
+          letterSpacing: header ? 0.5 : 0,
+        ),
+      ),
+    );
+  }
+}
+
+class _CloudBar extends StatelessWidget {
+  final int pct;
+  const _CloudBar({required this.pct});
+
+  Color get _barColor {
+    if (pct <= 20) return AppColors.scoreExcellent;
+    if (pct <= 40) return AppColors.scoreGood;
+    if (pct <= 60) return AppColors.scoreFair;
+    if (pct <= 80) return AppColors.scoreAmber;
+    return AppColors.scorePoor;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: Stack(
+            children: [
+              Container(
+                height: 8,
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceBorder,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+              FractionallySizedBox(
+                widthFactor: pct / 100,
+                child: Container(
+                  height: 8,
+                  decoration: BoxDecoration(
+                    color: _barColor,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 3),
+        Text(
+          '$pct%',
+          style: const TextStyle(
+            color: AppColors.textMuted,
+            fontSize: 9,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _DotRating extends StatelessWidget {
+  final int value;
+  final int max;
+  const _DotRating({required this.value, required this.max});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: List.generate(max, (i) {
+        final filled = i < value;
+        final color = filled ? AppColors.primary : AppColors.surfaceBorder;
+        return Container(
+          width: 6,
+          height: 6,
+          margin: const EdgeInsets.symmetric(horizontal: 1),
+          decoration: BoxDecoration(
+            color: color,
+            shape: BoxShape.circle,
+          ),
+        );
+      }),
+    );
+  }
+}
