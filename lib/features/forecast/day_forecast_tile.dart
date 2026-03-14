@@ -46,7 +46,9 @@ class _DayForecastTileState extends State<DayForecastTile> {
         duration: const Duration(milliseconds: 250),
         margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
         decoration: BoxDecoration(
-          color: isToday ? AppColors.surfaceElevated : AppColors.surface,
+          color: isToday
+              ? AppColors.surfaceElevated.withAlpha(205)
+              : AppColors.surface.withAlpha(190),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: isToday
@@ -434,7 +436,7 @@ class _MoonInfo extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: AppColors.background,
+        color: AppColors.background.withAlpha(185),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: AppColors.surfaceBorder),
       ),

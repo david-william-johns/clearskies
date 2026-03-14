@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'theme/app_theme.dart';
 import 'features/forecast/forecast_screen.dart';
 import 'features/forecast/settings_screen.dart';
+import 'widgets/starfield_background.dart';
 
 void main() {
   runApp(const ProviderScope(child: ClearSkiesApp()));
@@ -40,7 +41,13 @@ class _AppShellState extends State<_AppShell> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: IndexedStack(index: _tab, children: _tabs),
+      backgroundColor: AppColors.background,
+      body: Stack(
+        children: [
+          const StarfieldBackground(),
+          IndexedStack(index: _tab, children: _tabs),
+        ],
+      ),
       bottomNavigationBar: NavigationBar(
         backgroundColor: AppColors.surface,
         indicatorColor: AppColors.primary.withAlpha(40),

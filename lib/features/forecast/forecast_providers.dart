@@ -1,8 +1,10 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
+import '../../models/celestial_event.dart';
 import '../../models/day_forecast.dart';
 import '../../models/location.dart';
+import '../../services/celestial_events_service.dart';
 import '../../services/forecast_repository.dart';
 
 // ─── Location provider ───────────────────────────────────────────────────────
@@ -42,4 +44,12 @@ final forecastProvider =
     FutureProvider.family<List<DayForecast>, AppLocation>((ref, loc) async {
   final repo = ref.watch(forecastRepositoryProvider);
   return repo.getForecast(lat: loc.latitude, lon: loc.longitude);
+});
+
+// ─── Celestial events provider ───────────────────────────────────────────────
+
+final celestialEventsProvider =
+    FutureProvider.family<List<CelestialEvent>, AppLocation>((ref, loc) async {
+  final service = CelestialEventsService();
+  return service.getAll(lat: loc.latitude, lon: loc.longitude);
 });

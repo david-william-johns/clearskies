@@ -9,11 +9,11 @@ class AppColors {
   static const primary = Color(0xFF4FC3F7); // star-blue accent
   static const primaryDim = Color(0xFF1E88B4);
 
-  static const scoreExcellent = Color(0xFF4CAF50);
-  static const scoreGood = Color(0xFF8BC34A);
-  static const scoreFair = Color(0xFFFFC107);
-  static const scoreAmber = Color(0xFFFF9800);
-  static const scorePoor = Color(0xFFF44336);
+  static const scoreExcellent = Color(0xFF4FC3F7); // bright sky-blue  (≥80)
+  static const scoreGood      = Color(0xFF80DEEA); // cyan-teal         (65–79)
+  static const scoreFair      = Color(0xFFB0BEC5); // silver-blue grey  (50–64)
+  static const scoreAmber     = Color(0xFF78909C); // medium slate      (35–49)
+  static const scorePoor      = Color(0xFF607D8B); // dark slate        (<35)
 
   static const textPrimary = Color(0xFFE8EAF6);
   static const textSecondary = Color(0xFF9BA4BC);

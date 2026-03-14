@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import '../../models/celestial_event.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/mini_calendar.dart';
 import '../location/location_search_screen.dart';
+import 'celestial_events_bar.dart';
 import 'forecast_providers.dart';
 import 'day_forecast_tile.dart';
 
@@ -33,11 +36,16 @@ class _ForecastBody extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final forecastAsync = ref.watch(forecastProvider(location));
+    final celestialAsync = ref.watch(celestialEventsProvider(location));
+    final celestialEvents = celestialAsync.valueOrNull ?? [];
+    final orbitalEvents = celestialEvents
+        .where((e) => e.type == CelestialEventType.orbital)
+        .toList();
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
-        backgroundColor: AppColors.background,
+        backgroundColor: AppColors.background.withAlpha(215),
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -84,82 +92,103 @@ class _ForecastBody extends ConsumerWidget {
           ),
         ],
       ),
-      body: forecastAsync.when(
-        loading: () => const Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              CircularProgressIndicator(
-                  valueColor:
-                      AlwaysStoppedAnimation<Color>(AppColors.primary)),
-              SizedBox(height: 16),
-              Text('Fetching sky conditions…',
-                  style: TextStyle(color: AppColors.textSecondary)),
-            ],
+      body: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Left panel: sticky mini calendar
+          Container(
+            width: 155,
+            color: Colors.transparent,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(8, 14, 4, 0),
+              child: MiniCalendar(orbitalEvents: orbitalEvents),
+            ),
           ),
-        ),
-        error: (e, stack) => Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.cloud_off, color: AppColors.scorePoor, size: 48),
-                const SizedBox(height: 16),
-                const Text(
-                  'Could not load forecast',
-                  style: TextStyle(
-                      color: AppColors.textPrimary, fontWeight: FontWeight.w600),
+          // Right panel: scrolling forecast list
+          Expanded(
+            child: forecastAsync.when(
+              loading: () => const Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    CircularProgressIndicator(
+                        valueColor:
+                            AlwaysStoppedAnimation<Color>(AppColors.primary)),
+                    SizedBox(height: 16),
+                    Text('Fetching sky conditions…',
+                        style: TextStyle(color: AppColors.textSecondary)),
+                  ],
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  e.toString(),
-                  style: const TextStyle(
-                      color: AppColors.textSecondary, fontSize: 12),
-                  textAlign: TextAlign.center,
+              ),
+              error: (e, stack) => Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.cloud_off,
+                          color: AppColors.textSecondary, size: 48),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'Could not load forecast',
+                        style: TextStyle(
+                            color: AppColors.textPrimary,
+                            fontWeight: FontWeight.w600),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        e.toString(),
+                        style: const TextStyle(
+                            color: AppColors.textSecondary, fontSize: 12),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 20),
+                      OutlinedButton(
+                        onPressed: () =>
+                            ref.invalidate(forecastProvider(location)),
+                        style: OutlinedButton.styleFrom(
+                            foregroundColor: AppColors.primary,
+                            side: const BorderSide(
+                                color: AppColors.primary, width: 1)),
+                        child: const Text('Retry'),
+                      ),
+                    ],
+                  ),
                 ),
-                const SizedBox(height: 20),
-                OutlinedButton(
-                  onPressed: () =>
+              ),
+              data: (forecasts) {
+                return RefreshIndicator(
+                  onRefresh: () async =>
                       ref.invalidate(forecastProvider(location)),
-                  style: OutlinedButton.styleFrom(
-                      foregroundColor: AppColors.primary,
-                      side:
-                          const BorderSide(color: AppColors.primary, width: 1)),
-                  child: const Text('Retry'),
-                ),
-              ],
+                  color: AppColors.primary,
+                  backgroundColor: AppColors.surface.withAlpha(200),
+                  child: ListView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    children: [
+                      _LegendBar(),
+                      CelestialEventsBar(events: celestialEvents),
+                      const SizedBox(height: 4),
+                      ...forecasts.asMap().entries.map((e) {
+                        final isToday = e.key == 0;
+                        return DayForecastTile(
+                          key: ValueKey(e.value.date),
+                          forecast: e.value,
+                          initiallyExpanded: isToday,
+                        )
+                            .animate(delay: (e.key * 40).ms)
+                            .fadeIn(duration: 300.ms)
+                            .slideY(begin: 0.05, end: 0, duration: 300.ms);
+                      }),
+                      const SizedBox(height: 20),
+                      const _Footer(),
+                      const SizedBox(height: 8),
+                    ],
+                  ),
+                );
+              },
             ),
           ),
-        ),
-        data: (forecasts) {
-          return RefreshIndicator(
-            onRefresh: () async => ref.invalidate(forecastProvider(location)),
-            color: AppColors.primary,
-            backgroundColor: AppColors.surface,
-            child: ListView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              children: [
-                _LegendBar(),
-                const SizedBox(height: 4),
-                ...forecasts.asMap().entries.map((e) {
-                  final isToday = e.key == 0;
-                  return DayForecastTile(
-                    key: ValueKey(e.value.date),
-                    forecast: e.value,
-                    initiallyExpanded: isToday,
-                  )
-                      .animate(delay: (e.key * 40).ms)
-                      .fadeIn(duration: 300.ms)
-                      .slideY(begin: 0.05, end: 0, duration: 300.ms);
-                }),
-                const SizedBox(height: 20),
-                const _Footer(),
-                const SizedBox(height: 8),
-              ],
-            ),
-          );
-        },
+        ],
       ),
     );
   }
@@ -239,7 +268,7 @@ class _LoadingScaffold extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Colors.transparent,
       body: Center(
         child: CircularProgressIndicator(
             valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary)),
@@ -255,7 +284,7 @@ class _ErrorScaffold extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Colors.transparent,
       body: Center(
         child: Text(message,
             style: const TextStyle(color: AppColors.textSecondary)),

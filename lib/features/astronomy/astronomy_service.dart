@@ -149,6 +149,131 @@ class AstronomyService {
     return alt / _rad;
   }
 
+  // ─── Planet positions (Meeus low-precision orbital elements) ────────────────
+
+  // Orbital elements at J2000.0: [L0, L1, a, e0, e1, i, Omega, omega, M0, M1]
+  // L0/L1 = mean longitude and rate (°/day)
+  // e0/e1 = eccentricity and rate
+  // i = inclination, Omega = long. ascending node, omega = long. perihelion
+  // M0/M1 = mean anomaly and rate
+  // Source: Meeus "Astronomical Algorithms" ch.33 simplified elements
+  static const Map<String, List<double>> _planetElements = {
+    'Mercury': [252.2503, 4.0923344, 0.38710, 0.20563069, 0.0, 7.005, 48.331, 77.456, 174.7948, 4.0923344],
+    'Venus':   [181.9798, 1.6021302, 0.72332, 0.00677323, 0.0, 3.395, 76.680, 131.564, 50.4161, 1.6021302],
+    'Mars':    [355.4330, 0.5240207, 1.52366, 0.09341233, 0.0, 1.850, 49.558, 336.060, 19.3730, 0.5240207],
+    'Jupiter': [ 34.3515, 0.0830853, 5.20260, 0.04849485, 0.0, 1.303, 100.464, 14.331, 20.0202, 0.0830853],
+    'Saturn':  [ 50.0774, 0.0334442, 9.55491, 0.05550825, 0.0, 2.489, 113.666, 93.057, 317.0207, 0.0334442],
+  };
+
+  /// Returns the altitude in degrees of [planet] at [lat]/[lon] at [time].
+  /// [planet] must be one of: Mercury, Venus, Mars, Jupiter, Saturn.
+  /// Returns null if planet is unknown.
+  double? planetAltitude({
+    required String planet,
+    required double lat,
+    required double lon,
+    required DateTime time,
+  }) {
+    final el = _planetElements[planet];
+    if (el == null) return null;
+
+    final d = _toDays(time.toUtc());
+
+    // Earth's heliocentric coordinates (simplified)
+    final mSun = (357.5291 + 0.98560028 * d) * _rad;
+    final lSun = (280.4665 + 0.9856474 * d) * _rad;
+    final c = (1.9148 * sin(mSun) + 0.02 * sin(2 * mSun)) * _rad;
+    final lambdaSun = lSun + c + pi;
+    final earthX = cos(lambdaSun);
+    final earthY = sin(lambdaSun) * cos(_e);
+    final earthZ = sin(lambdaSun) * sin(_e);
+
+    // Planet mean anomaly
+    final M = ((el[8] + el[9] * d) % 360) * _rad;
+    // Equation of centre (simplified)
+    final v = M + 2 * el[3] * sin(M) + 1.25 * el[3] * el[3] * sin(2 * M);
+    // Heliocentric ecliptic longitude (simplified)
+    final omega = el[7] * _rad;
+    final bigOmega = el[6] * _rad;
+    final iRad = el[5] * _rad;
+    final r = el[2] * (1 - el[3] * el[3]) / (1 + el[3] * cos(v));
+
+    // Heliocentric ecliptic coordinates
+    final u = v + omega - bigOmega;
+    final pX = r * (cos(bigOmega) * cos(u) - sin(bigOmega) * sin(u) * cos(iRad));
+    final pY = r * (sin(bigOmega) * cos(u) + cos(bigOmega) * sin(u) * cos(iRad));
+    final pZ = r * sin(u) * sin(iRad);
+
+    // Geocentric ecliptic coordinates (subtract Earth)
+    final gX = pX - earthX;
+    final gY = pY - earthY;
+    final gZ = pZ - earthZ;
+
+    // Convert to equatorial
+    final ra = atan2(gY * cos(_e) - gZ * sin(_e), gX);
+    final dec = asin((gY * sin(_e) + gZ * cos(_e)) /
+        sqrt(gX * gX + gY * gY + gZ * gZ));
+
+    // Compute altitude
+    final phi = lat * _rad;
+    final lw = -lon * _rad;
+    final H = (280.16 + 360.9856235 * d) * _rad - lw - ra; // hour angle
+    final alt = asin(sin(phi) * sin(dec) + cos(phi) * cos(dec) * cos(H));
+    return alt / _rad;
+  }
+
+  /// Checks if [planet] is visible (altitude > [minAlt] degrees) at any point
+  /// during astronomical darkness at [lat]/[lon] on [date].
+  bool isPlanetVisibleOnNight({
+    required String planet,
+    required double lat,
+    required double lon,
+    required DateTime date,
+    double minAlt = 10.0,
+  }) {
+    final (dusk, dawn) = getAstronomicalTwilight(lat: lat, lon: lon, forDate: date);
+    if (dusk == null || dawn == null) return false;
+
+    // Sample every hour during the dark window
+    var t = dusk;
+    while (t.isBefore(dawn)) {
+      final alt = planetAltitude(planet: planet, lat: lat, lon: lon, time: t);
+      if (alt != null && alt > minAlt) return true;
+      t = t.add(const Duration(hours: 1));
+    }
+    return false;
+  }
+
+  // ─── Moon phase event scanning ───────────────────────────────────────────────
+
+  /// Scans [from]…[from + days] for new moon and full moon crossings.
+  /// Returns list of (date, phaseName) for each detected event.
+  List<(DateTime, String)> findMoonPhaseEvents({
+    required DateTime from,
+    int days = 30,
+  }) {
+    final events = <(DateTime, String)>[];
+    double? prev;
+    for (int i = 0; i <= days; i++) {
+      final d = from.add(Duration(days: i));
+      final phase = moonPhase(d);
+      if (prev != null) {
+        // New moon: phase transitions through 0 (crosses from high ~0.97+ to low ~0.03-)
+        if (prev > 0.85 && phase < 0.15) {
+          events.add((d, 'New Moon'));
+        }
+        // Full moon: phase crosses 0.5
+        if (prev < 0.48 && phase >= 0.5) {
+          events.add((d, 'Full Moon'));
+        } else if (prev >= 0.5 && phase < 0.52 && phase > 0.48) {
+          // Already past 0.5 — ignore duplicates
+        }
+      }
+      prev = phase;
+    }
+    return events;
+  }
+
   /// Moon phase 0.0 (new) → 0.5 (full) → 1.0 (new again).
   double moonPhase(DateTime date) {
     final d = _toDays(date.toUtc());
