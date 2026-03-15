@@ -113,7 +113,7 @@ class AstronomyService {
     final jSet = _getSetJ(h0, lw, phi, dec, n, m, l);
     if (jSet.isNaN) return (null, null);
     final jRise = jNoon - (jSet - jNoon);
-    return (_fromJulian(jSet), _fromJulian(jRise));
+    return (_fromJulian(jSet), _fromJulian(jRise + 1));
   }
 
   // ─── Moon position ──────────────────────────────────────────────────────────

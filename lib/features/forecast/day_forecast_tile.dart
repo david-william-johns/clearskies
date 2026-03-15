@@ -145,6 +145,17 @@ class _CollapsedHeader extends StatelessWidget {
         'Moonrise: $riseStr  ·  Moonset: $setStr';
   }
 
+  String _scoreTooltip(DayForecast f) {
+    final seeing = f.avgSeeing > 0 ? '${f.avgSeeing.toStringAsFixed(1)}/5' : 'N/A';
+    return 'Clear Sky Score: ${f.clearSkyScore}/100\n'
+        'Composite score for telescope observing conditions\n\n'
+        'Cloud cover (40%): ${f.bestCloudCover}%\n'
+        'Seeing quality (25%): $seeing\n'
+        'Moon illumination (10%): ${f.moonIlluminationPct}%\n'
+        'Humidity (3%): ${f.avgHumidity}%\n'
+        'Wind speed (2%): ${f.avgWindKmh.round()} km/h';
+  }
+
   String _moonTooltip(DayForecast f) {
     final riseStr =
         f.moonRise != null ? DateFormat('HH:mm').format(f.moonRise!.toLocal()) : '--:--';
@@ -208,7 +219,7 @@ class _CollapsedHeader extends StatelessWidget {
                   children: [
                     _WeatherChip(
                         icon: Icons.cloud_outlined,
-                        label: '${f.bestCloudCover}% cloud'),
+                        label: '${f.bestCloudCover}% cloud cover'),
                     _WeatherChip(
                         icon: Icons.thermostat,
                         label:
@@ -284,7 +295,10 @@ class _CollapsedHeader extends StatelessWidget {
           // Score badge + chevron
           Column(
             children: [
-              ClearSkyScoreBadge(score: score),
+              Tooltip(
+                message: _scoreTooltip(f),
+                child: ClearSkyScoreBadge(score: score),
+              ),
               const SizedBox(height: 2),
               AnimatedRotation(
                 turns: expanded ? 0.5 : 0,
@@ -395,7 +409,7 @@ class _DarkWindowSummary extends StatelessWidget {
           children: [
             _DetailChip(
               icon: Icons.cloud_outlined,
-              label: 'Cloud (best)',
+              label: 'Cloud cover',
               value: '${f.bestCloudCover}%',
             ),
             _DetailChip(
@@ -649,10 +663,10 @@ class _MoonInfo extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               _MoonTime(
-                  icon: Icons.arrow_upward, label: 'Rise', time: riseStr),
+                  icon: Icons.arrow_upward, label: 'Moonrise', time: riseStr),
               const SizedBox(height: 2),
               _MoonTime(
-                  icon: Icons.arrow_downward, label: 'Set', time: setStr),
+                  icon: Icons.arrow_downward, label: 'Moonset', time: setStr),
             ],
           ),
         ],
@@ -660,7 +674,7 @@ class _MoonInfo extends StatelessWidget {
     );
   }
 
-  String _fmt(DateTime t) => DateFormat('HH:mm').format(t.toLocal());
+  String _fmt(DateTime t) => DateFormat('h:mm a').format(t.toLocal());
 }
 
 class _MoonTime extends StatelessWidget {

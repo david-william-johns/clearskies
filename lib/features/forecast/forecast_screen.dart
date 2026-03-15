@@ -184,7 +184,7 @@ class _ForecastBody extends ConsumerWidget {
                         return DayForecastTile(
                           key: ValueKey(e.value.date),
                           forecast: e.value,
-                          initiallyExpanded: isToday,
+                          initiallyExpanded: false,
                         )
                             .animate(delay: (e.key * 40).ms)
                             .fadeIn(duration: 300.ms)

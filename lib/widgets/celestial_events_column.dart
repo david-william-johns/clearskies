@@ -14,6 +14,18 @@ class CelestialEventsColumn extends StatelessWidget {
   Widget build(BuildContext context) {
     if (events.isEmpty) return const SizedBox.shrink();
 
+    // Collapse consecutive events with the same name into a single card
+    // (handles repeated per-night planet events like "Jupiter Visible" × 14)
+    final grouped = <({CelestialEvent event, int count})>[];
+    for (final e in events) {
+      if (grouped.isNotEmpty && grouped.last.event.name == e.name) {
+        final last = grouped.removeLast();
+        grouped.add((event: last.event, count: last.count + 1));
+      } else {
+        grouped.add((event: e, count: 1));
+      }
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -34,16 +46,26 @@ class CelestialEventsColumn extends StatelessWidget {
             ],
           ),
         ),
-        ...events.map((e) => _EventCard(event: e)),
+        ...grouped.map((g) => _EventCard(event: g.event, nightCount: g.count)),
         const SizedBox(height: 8),
       ],
     );
   }
 }
 
+Color planetColor(String eventName) {
+  if (eventName.startsWith('Mercury')) return const Color(0xFF9E9E9E);
+  if (eventName.startsWith('Venus'))   return const Color(0xFFFFF59D);
+  if (eventName.startsWith('Mars'))    return const Color(0xFFFF5252);
+  if (eventName.startsWith('Jupiter')) return const Color(0xFFFFB74D);
+  if (eventName.startsWith('Saturn'))  return const Color(0xFFFFD54F);
+  return AppColors.primary;
+}
+
 class _EventCard extends StatelessWidget {
   final CelestialEvent event;
-  const _EventCard({required this.event});
+  final int nightCount;
+  const _EventCard({required this.event, this.nightCount = 1});
 
   Color get _accentColor {
     switch (event.type) {
@@ -52,7 +74,7 @@ class _EventCard extends StatelessWidget {
       case CelestialEventType.aurora:
         return const Color(0xFF00E676);
       case CelestialEventType.planet:
-        return AppColors.primary;
+        return planetColor(event.name);
       case CelestialEventType.moon:
         return AppColors.moonGold;
       case CelestialEventType.orbital:
@@ -84,6 +106,15 @@ class _EventCard extends StatelessWidget {
     if (diff == 1) return 'Tomorrow';
     if (diff <= 6) return 'In $diff days';
     return DateFormat('d MMM').format(date);
+  }
+
+  String get _description {
+    if (nightCount > 1) {
+      // Extract planet name from e.g. "Jupiter Visible" → "Jupiter"
+      final planet = event.name.replaceAll(' Visible', '');
+      return '$planet above 10° during dark window — $nightCount nights';
+    }
+    return event.description;
   }
 
   @override
@@ -147,7 +178,7 @@ class _EventCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 1),
                     Text(
-                      event.description,
+                      _description,
                       style: const TextStyle(
                         color: AppColors.textMuted,
                         fontSize: 8,

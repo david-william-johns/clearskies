@@ -36,6 +36,15 @@ class ClearSkyScoreBadge extends StatelessWidget {
               height: 1.1,
             ),
           ),
+          Text(
+            '/100',
+            style: TextStyle(
+              color: color.withAlpha(180),
+              fontSize: large ? 9.0 : 7.0,
+              fontWeight: FontWeight.w500,
+              height: 1.1,
+            ),
+          ),
           if (large)
             Text(
               label,

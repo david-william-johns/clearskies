@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models/celestial_event.dart';
 import '../theme/app_theme.dart';
+import 'celestial_events_column.dart' show planetColor;
 
 /// A compact two-month calendar (current + next) for the left panel.
 /// Pass [allEvents] to show colour-coded indicator dots on event dates.
@@ -10,16 +11,31 @@ class MiniCalendar extends StatelessWidget {
 
   const MiniCalendar({super.key, this.allEvents = const []});
 
+  Color _eventColor(CelestialEvent e) {
+    switch (e.type) {
+      case CelestialEventType.meteorShower:
+        return const Color(0xFFFFAB40);
+      case CelestialEventType.aurora:
+        return const Color(0xFF00E676);
+      case CelestialEventType.planet:
+        return planetColor(e.name);
+      case CelestialEventType.moon:
+        return AppColors.moonGold;
+      case CelestialEventType.orbital:
+        return AppColors.textSecondary;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
 
-    // Build map from date → event type (first event wins for dot colour)
-    final eventDates = <DateTime, CelestialEventType>{};
+    // Build map from date → colour (first event per date wins)
+    final eventColors = <DateTime, Color>{};
     for (final e in allEvents) {
       final d = DateTime(e.date.year, e.date.month, e.date.day);
-      eventDates.putIfAbsent(d, () => e.type);
+      eventColors.putIfAbsent(d, () => _eventColor(e));
     }
 
     // Next month
@@ -33,14 +49,14 @@ class MiniCalendar extends StatelessWidget {
           year: now.year,
           month: now.month,
           today: today,
-          eventDates: eventDates,
+          eventColors: eventColors,
         ),
         const SizedBox(height: 14),
         _MonthGrid(
           year: nextMonth.year,
           month: nextMonth.month,
           today: today,
-          eventDates: eventDates,
+          eventColors: eventColors,
         ),
       ],
     );
@@ -53,13 +69,13 @@ class _MonthGrid extends StatelessWidget {
   final int year;
   final int month;
   final DateTime today;
-  final Map<DateTime, CelestialEventType> eventDates;
+  final Map<DateTime, Color> eventColors;
 
   const _MonthGrid({
     required this.year,
     required this.month,
     required this.today,
-    required this.eventDates,
+    required this.eventColors,
   });
 
   @override
@@ -73,7 +89,7 @@ class _MonthGrid extends StatelessWidget {
         Text(
           DateFormat('MMMM yyyy').format(monthDate),
           style: const TextStyle(
-            color: AppColors.textSecondary,
+            color: Colors.white,
             fontSize: 11,
             fontWeight: FontWeight.w600,
             letterSpacing: 0.4,
@@ -87,7 +103,7 @@ class _MonthGrid extends StatelessWidget {
           year: year,
           month: month,
           today: today,
-          eventDates: eventDates,
+          eventColors: eventColors,
         ),
       ],
     );
@@ -127,13 +143,13 @@ class _DaysGrid extends StatelessWidget {
   final int year;
   final int month;
   final DateTime today;
-  final Map<DateTime, CelestialEventType> eventDates;
+  final Map<DateTime, Color> eventColors;
 
   const _DaysGrid({
     required this.year,
     required this.month,
     required this.today,
-    required this.eventDates,
+    required this.eventColors,
   });
 
   @override
@@ -160,7 +176,7 @@ class _DaysGrid extends StatelessWidget {
                 year: year,
                 month: month,
                 today: today,
-                eventDates: eventDates,
+                eventColors: eventColors,
               ))
           .toList(),
     );
@@ -172,30 +188,15 @@ class _WeekRow extends StatelessWidget {
   final int year;
   final int month;
   final DateTime today;
-  final Map<DateTime, CelestialEventType> eventDates;
+  final Map<DateTime, Color> eventColors;
 
   const _WeekRow({
     required this.week,
     required this.year,
     required this.month,
     required this.today,
-    required this.eventDates,
+    required this.eventColors,
   });
-
-  Color _dotColor(CelestialEventType type) {
-    switch (type) {
-      case CelestialEventType.meteorShower:
-        return const Color(0xFFFFAB40);
-      case CelestialEventType.aurora:
-        return const Color(0xFF00E676);
-      case CelestialEventType.planet:
-        return AppColors.primary;
-      case CelestialEventType.moon:
-        return AppColors.moonGold;
-      case CelestialEventType.orbital:
-        return AppColors.textSecondary;
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -206,7 +207,7 @@ class _WeekRow extends StatelessWidget {
 
         final date = DateTime(year, month, day);
         final isToday = date == today;
-        final eventType = eventDates[date];
+        final dotColor = eventColors[date];
 
         Widget dayCell;
         if (isToday) {
@@ -228,12 +229,12 @@ class _WeekRow extends StatelessWidget {
               textAlign: TextAlign.center,
             ),
           );
-        } else if (eventType != null) {
+        } else if (dotColor != null) {
           dayCell = Container(
             width: 18,
             height: 18,
             decoration: BoxDecoration(
-              color: _dotColor(eventType),
+              color: dotColor,
               shape: BoxShape.circle,
             ),
             alignment: Alignment.center,
@@ -274,13 +275,9 @@ class _WeekRow extends StatelessWidget {
           ),
         );
 
-        if (eventType != null) {
-          final eventName = eventDates.keys
-              .where((k) => k == date)
-              .map((_) => eventType.name)
-              .firstOrNull;
+        if (dotColor != null) {
           cell = Tooltip(
-            message: eventName ?? eventType.name,
+            message: 'Event',
             child: cell,
           );
         }
