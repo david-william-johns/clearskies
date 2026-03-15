@@ -77,6 +77,11 @@ class _ForecastBody extends ConsumerWidget {
         ),
         actions: [
           IconButton(
+            icon: const Icon(Icons.refresh, color: AppColors.textSecondary),
+            tooltip: 'Refresh',
+            onPressed: () => ref.invalidate(forecastProvider(location)),
+          ),
+          IconButton(
             icon: const Icon(Icons.search, color: AppColors.textSecondary),
             tooltip: 'Change location',
             onPressed: () => Navigator.push(
@@ -86,9 +91,9 @@ class _ForecastBody extends ConsumerWidget {
             ),
           ),
           IconButton(
-            icon: const Icon(Icons.refresh, color: AppColors.textSecondary),
-            tooltip: 'Refresh',
-            onPressed: () => ref.invalidate(forecastProvider(location)),
+            icon: const Icon(Icons.settings, color: AppColors.textSecondary),
+            tooltip: 'Settings',
+            onPressed: null,
           ),
         ],
       ),

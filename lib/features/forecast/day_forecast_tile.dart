@@ -60,7 +60,12 @@ class _DayForecastTileState extends State<DayForecastTile> {
         ),
         child: Column(
           children: [
-            _CollapsedHeader(forecast: f, score: score, scoreColor: scoreColor, isToday: isToday, expanded: _expanded),
+            _CollapsedHeader(
+                forecast: f,
+                score: score,
+                scoreColor: scoreColor,
+                isToday: isToday,
+                expanded: _expanded),
             AnimatedCrossFade(
               duration: const Duration(milliseconds: 350),
               sizeCurve: Curves.easeInOutCubic,
@@ -80,7 +85,9 @@ class _DayForecastTileState extends State<DayForecastTile> {
 
   bool _isToday(DateTime date) {
     final now = DateTime.now();
-    return date.year == now.year && date.month == now.month && date.day == now.day;
+    return date.year == now.year &&
+        date.month == now.month &&
+        date.day == now.day;
   }
 }
 
@@ -101,6 +108,53 @@ class _CollapsedHeader extends StatelessWidget {
     required this.expanded,
   });
 
+  // Returns a human-readable night condition label matching NightWeatherIcon logic.
+  String _conditionLabel(DayForecast f) {
+    if (f.darkHourSlots.isEmpty) return 'Clear';
+    final n = f.darkHourSlots.length;
+    final avgCloud =
+        f.darkHourSlots.map((s) => s.cloudCoverTotal).reduce((a, b) => a + b) ~/
+            n;
+    final avgPrecip =
+        f.darkHourSlots
+            .map((s) => s.precipitationProbability)
+            .reduce((a, b) => a + b) ~/
+        n;
+    final avgTemp =
+        f.darkHourSlots.map((s) => s.temperature).reduce((a, b) => a + b) / n;
+    if (avgPrecip > 40 && avgTemp <= 1.0) return 'Snowy';
+    if (avgPrecip > 40) return 'Rainy';
+    if (avgCloud > 80) return 'Overcast';
+    if (avgCloud > 50) return 'Mostly Cloudy';
+    if (avgCloud > 20) return 'Partly Cloudy';
+    return 'Clear';
+  }
+
+  String _nightIconTooltip(DayForecast f) {
+    final condition = _conditionLabel(f);
+    final riseStr =
+        f.moonRise != null ? DateFormat('HH:mm').format(f.moonRise!.toLocal()) : '--:--';
+    final setStr =
+        f.moonSet != null ? DateFormat('HH:mm').format(f.moonSet!.toLocal()) : '--:--';
+    return 'Night condition: $condition\n'
+        'Avg cloud cover: ${f.bestCloudCover}%\n'
+        'Avg temperature: ${f.avgTemperature.toStringAsFixed(1)}°C\n'
+        'Avg wind: ${f.avgWindKmh.round()} km/h\n'
+        'Precipitation chance: ${f.maxPrecipPct}%\n'
+        'Moon: ${f.moonPhaseName} — ${f.moonIlluminationPct}% illuminated\n'
+        'Moonrise: $riseStr  ·  Moonset: $setStr';
+  }
+
+  String _moonTooltip(DayForecast f) {
+    final riseStr =
+        f.moonRise != null ? DateFormat('HH:mm').format(f.moonRise!.toLocal()) : '--:--';
+    final setStr =
+        f.moonSet != null ? DateFormat('HH:mm').format(f.moonSet!.toLocal()) : '--:--';
+    return '${f.moonPhaseName}\n'
+        '${f.moonIlluminationPct}% illuminated\n'
+        'Rises: $riseStr  ·  Sets: $setStr';
+  }
+
   @override
   Widget build(BuildContext context) {
     final f = forecast;
@@ -108,8 +162,7 @@ class _CollapsedHeader extends StatelessWidget {
         ? 'TODAY'
         : DateFormat('EEE').format(f.date.toLocal()).toUpperCase();
     final dateLabel = DateFormat('d MMM').format(f.date.toLocal());
-    final duskStr = _timeStr(f.astronomicalDusk);
-    final darkHours = f.darkDuration.inMinutes / 60;
+    final duskStr = DateFormat('HH:mm').format(f.astronomicalDusk.toLocal());
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -143,28 +196,38 @@ class _CollapsedHeader extends StatelessWidget {
 
           const SizedBox(width: 10),
 
-          // Cloud cover mini-bar + percentage
+          // Weather chips
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Cloud bar
-                _MiniCloudBar(pct: f.bestCloudCover),
+                // Row 1: cloud, temp, wind, precip
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 4,
+                  children: [
+                    _WeatherChip(
+                        icon: Icons.cloud_outlined,
+                        label: '${f.bestCloudCover}% cloud'),
+                    _WeatherChip(
+                        icon: Icons.thermostat,
+                        label:
+                            '${f.avgTemperature.toStringAsFixed(1)}°C'),
+                    _WeatherChip(
+                        icon: Icons.air,
+                        label: '${f.avgWindKmh.round()} km/h'),
+                    _WeatherChip(
+                        icon: Icons.water_drop_outlined,
+                        label: '${f.maxPrecipPct}% precip'),
+                  ],
+                ),
                 const SizedBox(height: 3),
+                // Row 2: dusk time
                 Row(
                   children: [
-                    Icon(Icons.cloud_outlined,
+                    const Icon(Icons.nightlight_round,
                         size: 11, color: AppColors.textMuted),
-                    const SizedBox(width: 2),
-                    Text(
-                      '${f.bestCloudCover}% cloud',
-                      style: const TextStyle(
-                          color: AppColors.textMuted, fontSize: 10),
-                    ),
-                    const SizedBox(width: 8),
-                    Icon(Icons.nightlight_round,
-                        size: 11, color: AppColors.textMuted),
-                    const SizedBox(width: 2),
+                    const SizedBox(width: 3),
                     Text(
                       'Dusk $duskStr',
                       style: const TextStyle(
@@ -176,38 +239,45 @@ class _CollapsedHeader extends StatelessWidget {
             ),
           ),
 
-          const SizedBox(width: 10),
+          const SizedBox(width: 8),
 
-          // Moon + dark hours
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Row(
-                children: [
-                  Text(
-                    f.moonPhaseEmoji,
-                    style: const TextStyle(fontSize: 14),
-                  ),
-                  const SizedBox(width: 3),
-                  Text(
-                    '${f.moonIlluminationPct}%',
-                    style: const TextStyle(
-                        color: AppColors.textMuted, fontSize: 10),
-                  ),
-                ],
-              ),
-              Text(
-                '${darkHours.toStringAsFixed(1)}h dark',
-                style: const TextStyle(
-                    color: AppColors.textMuted, fontSize: 10),
-              ),
-            ],
+          // Moon emoji + illumination (with tooltip)
+          Tooltip(
+            message: _moonTooltip(f),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      f.moonPhaseEmoji,
+                      style: const TextStyle(fontSize: 14),
+                    ),
+                    const SizedBox(width: 3),
+                    Text(
+                      '${f.moonIlluminationPct}%',
+                      style: const TextStyle(
+                          color: AppColors.textMuted, fontSize: 10),
+                    ),
+                  ],
+                ),
+                Text(
+                  '${(f.darkDuration.inMinutes / 60).toStringAsFixed(1)}h dark',
+                  style: const TextStyle(
+                      color: AppColors.textMuted, fontSize: 10),
+                ),
+              ],
+            ),
           ),
 
           const SizedBox(width: 8),
 
-          // Night weather animation
-          NightWeatherIcon(forecast: f),
+          // Night weather animation (with tooltip)
+          Tooltip(
+            message: _nightIconTooltip(f),
+            child: NightWeatherIcon(forecast: f),
+          ),
 
           const SizedBox(width: 8),
 
@@ -231,8 +301,27 @@ class _CollapsedHeader extends StatelessWidget {
       ),
     );
   }
+}
 
-  String _timeStr(DateTime t) => DateFormat('HH:mm').format(t.toLocal());
+// Small icon + label chip for collapsed header
+class _WeatherChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  const _WeatherChip({required this.icon, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 11, color: AppColors.textMuted),
+        const SizedBox(width: 2),
+        Text(label,
+            style:
+                const TextStyle(color: AppColors.textMuted, fontSize: 10)),
+      ],
+    );
+  }
 }
 
 // ─── Expanded body ───────────────────────────────────────────────────────────
@@ -286,16 +375,56 @@ class _DarkWindowSummary extends StatelessWidget {
     final dawn = _fmt(f.astronomicalDawn);
     final h = f.darkDuration.inHours;
     final m = f.darkDuration.inMinutes % 60;
+    final avgSeeingStr =
+        f.avgSeeing > 0 ? '${f.avgSeeing.toStringAsFixed(1)}/5' : 'N/A';
 
-    return Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // Dark window time
         _InfoChip(
           icon: Icons.nightlight_outlined,
-          label: 'Dark',
-          value: '$dusk – $dawn ($h h ${m}m)',
+          label: 'Dark window',
+          value: '$dusk – $dawn  ($h h ${m}m)',
         ),
-        const SizedBox(width: 12),
-        ClearSkyScoreBadge(score: f.clearSkyScore, large: true),
+        const SizedBox(height: 10),
+        // Weather detail chips
+        Wrap(
+          spacing: 10,
+          runSpacing: 8,
+          children: [
+            _DetailChip(
+              icon: Icons.cloud_outlined,
+              label: 'Cloud (best)',
+              value: '${f.bestCloudCover}%',
+            ),
+            _DetailChip(
+              icon: Icons.thermostat,
+              label: 'Temperature',
+              value: '${f.avgTemperature.toStringAsFixed(1)}°C avg',
+            ),
+            _DetailChip(
+              icon: Icons.air,
+              label: 'Wind',
+              value: '${f.avgWindKmh.round()} km/h avg',
+            ),
+            _DetailChip(
+              icon: Icons.water_drop_outlined,
+              label: 'Precipitation',
+              value: '${f.maxPrecipPct}% max chance',
+            ),
+            _DetailChip(
+              icon: Icons.opacity,
+              label: 'Humidity',
+              value: '${f.avgHumidity}% avg',
+            ),
+            _DetailChip(
+              icon: Icons.remove_red_eye_outlined,
+              label: 'Seeing',
+              value: avgSeeingStr,
+            ),
+          ],
+        ),
       ],
     );
   }
@@ -307,7 +436,8 @@ class _InfoChip extends StatelessWidget {
   final IconData icon;
   final String label;
   final String value;
-  const _InfoChip({required this.icon, required this.label, required this.value});
+  const _InfoChip(
+      {required this.icon, required this.label, required this.value});
 
   @override
   Widget build(BuildContext context) {
@@ -330,6 +460,49 @@ class _InfoChip extends StatelessWidget {
           ],
         ),
       ],
+    );
+  }
+}
+
+// Detailed chip used in expanded dark-window summary
+class _DetailChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  const _DetailChip(
+      {required this.icon, required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+      decoration: BoxDecoration(
+        color: AppColors.background.withAlpha(160),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.surfaceBorder),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 13, color: AppColors.textMuted),
+          const SizedBox(width: 5),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label,
+                  style: const TextStyle(
+                      color: AppColors.textMuted,
+                      fontSize: 9,
+                      letterSpacing: 0.3)),
+              Text(value,
+                  style: const TextStyle(
+                      color: AppColors.textPrimary,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600)),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }
@@ -391,7 +564,9 @@ class _CloudCoverChart extends StatelessWidget {
                     interval: (slots.length / 4).ceilToDouble(),
                     getTitlesWidget: (v, _) {
                       final idx = v.round();
-                      if (idx < 0 || idx >= slots.length) return const SizedBox();
+                      if (idx < 0 || idx >= slots.length) {
+                        return const SizedBox();
+                      }
                       return Text(
                         DateFormat('HH:mm').format(slots[idx].time.toLocal()),
                         style: const TextStyle(
@@ -473,9 +648,11 @@ class _MoonInfo extends StatelessWidget {
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              _MoonTime(icon: Icons.arrow_upward, label: 'Rise', time: riseStr),
+              _MoonTime(
+                  icon: Icons.arrow_upward, label: 'Rise', time: riseStr),
               const SizedBox(height: 2),
-              _MoonTime(icon: Icons.arrow_downward, label: 'Set', time: setStr),
+              _MoonTime(
+                  icon: Icons.arrow_downward, label: 'Set', time: setStr),
             ],
           ),
         ],
@@ -490,7 +667,8 @@ class _MoonTime extends StatelessWidget {
   final IconData icon;
   final String label;
   final String time;
-  const _MoonTime({required this.icon, required this.label, required this.time});
+  const _MoonTime(
+      {required this.icon, required this.label, required this.time});
 
   @override
   Widget build(BuildContext context) {
@@ -501,51 +679,10 @@ class _MoonTime extends StatelessWidget {
         const SizedBox(width: 3),
         Text(
           '$label $time',
-          style: const TextStyle(color: AppColors.textSecondary, fontSize: 11),
+          style: const TextStyle(
+              color: AppColors.textSecondary, fontSize: 11),
         ),
       ],
     );
-  }
-}
-
-// ─── Mini cloud bar (for collapsed) ─────────────────────────────────────────
-
-class _MiniCloudBar extends StatelessWidget {
-  final int pct;
-  const _MiniCloudBar({required this.pct});
-
-  Color get _color {
-    if (pct <= 20) return AppColors.scoreExcellent;
-    if (pct <= 40) return AppColors.scoreGood;
-    if (pct <= 60) return AppColors.scoreFair;
-    if (pct <= 80) return AppColors.scoreAmber;
-    return AppColors.scorePoor;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(builder: (ctx, constraints) {
-      final w = constraints.maxWidth;
-      return Stack(
-        children: [
-          Container(
-            height: 4,
-            width: w,
-            decoration: BoxDecoration(
-              color: AppColors.surfaceBorder,
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-          Container(
-            height: 4,
-            width: w * pct / 100,
-            decoration: BoxDecoration(
-              color: _color,
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-        ],
-      );
-    });
   }
 }

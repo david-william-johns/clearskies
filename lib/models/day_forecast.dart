@@ -69,4 +69,43 @@ class DayForecast {
     final angle = (moonPhase * 2 * 3.14159265).abs();
     return ((1 - (angle / 3.14159265 - 1).abs()) * 100).round().clamp(0, 100);
   }
+
+  /// Average temperature across dark hours (°C).
+  double get avgTemperature {
+    if (darkHourSlots.isEmpty) return 0.0;
+    return darkHourSlots.map((s) => s.temperature).reduce((a, b) => a + b) /
+        darkHourSlots.length;
+  }
+
+  /// Average wind speed across dark hours, converted from knots to km/h.
+  double get avgWindKmh {
+    if (darkHourSlots.isEmpty) return 0.0;
+    final avgKnots =
+        darkHourSlots.map((s) => s.windSpeedKnots).reduce((a, b) => a + b) /
+            darkHourSlots.length;
+    return avgKnots * 1.852;
+  }
+
+  /// Maximum precipitation probability across dark hours (%).
+  int get maxPrecipPct {
+    if (darkHourSlots.isEmpty) return 0;
+    return darkHourSlots
+        .map((s) => s.precipitationProbability)
+        .reduce((a, b) => a > b ? a : b);
+  }
+
+  /// Average relative humidity across dark hours (%).
+  int get avgHumidity {
+    if (darkHourSlots.isEmpty) return 0;
+    return (darkHourSlots.map((s) => s.humidity).reduce((a, b) => a + b) /
+            darkHourSlots.length)
+        .round();
+  }
+
+  /// Average seeing quality across dark hours (1–5 scale, 5 = best).
+  double get avgSeeing {
+    if (darkHourSlots.isEmpty) return 0.0;
+    return darkHourSlots.map((s) => s.seeing).reduce((a, b) => a + b) /
+        darkHourSlots.length;
+  }
 }

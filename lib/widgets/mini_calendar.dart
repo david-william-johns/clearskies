@@ -208,37 +208,59 @@ class _WeekRow extends StatelessWidget {
         final isToday = date == today;
         final eventType = eventDates[date];
 
-        Widget dayCell = isToday
-            ? Container(
-                width: 18,
-                height: 18,
-                decoration: const BoxDecoration(
-                  color: AppColors.primary,
-                  shape: BoxShape.circle,
-                ),
-                alignment: Alignment.center,
-                child: Text(
-                  '$day',
-                  style: const TextStyle(
-                    color: AppColors.background,
-                    fontSize: 9,
-                    fontWeight: FontWeight.w700,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              )
-            : SizedBox(
-                width: 18,
-                height: 18,
-                child: Text(
-                  '$day',
-                  style: const TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 9,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              );
+        Widget dayCell;
+        if (isToday) {
+          dayCell = Container(
+            width: 18,
+            height: 18,
+            decoration: const BoxDecoration(
+              color: AppColors.primary,
+              shape: BoxShape.circle,
+            ),
+            alignment: Alignment.center,
+            child: Text(
+              '$day',
+              style: const TextStyle(
+                color: AppColors.background,
+                fontSize: 9,
+                fontWeight: FontWeight.w700,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          );
+        } else if (eventType != null) {
+          dayCell = Container(
+            width: 18,
+            height: 18,
+            decoration: BoxDecoration(
+              color: _dotColor(eventType),
+              shape: BoxShape.circle,
+            ),
+            alignment: Alignment.center,
+            child: Text(
+              '$day',
+              style: const TextStyle(
+                color: Colors.black,
+                fontSize: 9,
+                fontWeight: FontWeight.w700,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          );
+        } else {
+          dayCell = SizedBox(
+            width: 18,
+            height: 18,
+            child: Text(
+              '$day',
+              style: const TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 9,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          );
+        }
 
         Widget cell = SizedBox(
           width: 20,
@@ -247,17 +269,7 @@ class _WeekRow extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.start,
             children: [
               dayCell,
-              if (eventType != null)
-                Container(
-                  width: 4,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: _dotColor(eventType),
-                    shape: BoxShape.circle,
-                  ),
-                )
-              else
-                const SizedBox(height: 4),
+              const SizedBox(height: 4),
             ],
           ),
         );
