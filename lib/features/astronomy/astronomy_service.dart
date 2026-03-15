@@ -116,6 +116,31 @@ class AstronomyService {
     return (_fromJulian(jSet), _fromJulian(jRise + 1));
   }
 
+  /// Returns [sunrise, sunset] times as UTC DateTimes for the standard solar
+  /// horizon (-0.833°) for the date of [forDate] at [lat]/[lon].
+  ///
+  /// Returns null for either value if the sun is always above/below horizon.
+  (DateTime?, DateTime?) getSunriseSunset({
+    required double lat,
+    required double lon,
+    required DateTime forDate,
+  }) {
+    final lw = -lon * _rad;
+    final phi = lat * _rad;
+    final d = _toDays(DateTime.utc(forDate.year, forDate.month, forDate.day, 12));
+    final n = _julianCycle(d, lw);
+    final ds = _approxTransit(0, lw, n);
+    final m = _solarMeanAnomaly(ds);
+    final l = _eclipticLongitude(m);
+    final jNoon = _solarTransitJ(ds, m, l);
+    final dec = _sunCoords(d)['dec']!;
+    const h0 = -0.8333 * _rad; // standard sunrise/sunset horizon
+    final jSet = _getSetJ(h0, lw, phi, dec, n, m, l);
+    if (jSet.isNaN) return (null, null);
+    final jRise = jNoon - (jSet - jNoon);
+    return (_fromJulian(jRise), _fromJulian(jSet));
+  }
+
   // ─── Moon position ──────────────────────────────────────────────────────────
 
   static Map<String, double> _moonCoords(double d) {

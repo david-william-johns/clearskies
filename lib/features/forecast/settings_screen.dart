@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../theme/app_theme.dart';
+import 'history_events_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -66,10 +67,61 @@ class _SettingsScreenState extends State<SettingsScreen> {
         backgroundColor: AppColors.background,
         title: const Text('Settings'),
         foregroundColor: AppColors.textPrimary,
+        actions: [
+          if (Navigator.canPop(context))
+            IconButton(
+              icon: const Icon(Icons.close, color: AppColors.textSecondary),
+              tooltip: 'Close',
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+        ],
       ),
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [
+          // ── FEATURES section ────────────────────────────────────────────
+          const _SectionTitle('FEATURES'),
+          const SizedBox(height: 10),
+          _Card(
+            child: InkWell(
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (_) => const HistoryEventsScreen()),
+              ),
+              borderRadius: BorderRadius.circular(8),
+              child: Row(
+                children: [
+                  const Icon(Icons.history_edu,
+                      color: AppColors.primary, size: 18),
+                  const SizedBox(width: 10),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'History Events',
+                          style: TextStyle(
+                            color: AppColors.textPrimary,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13,
+                          ),
+                        ),
+                        Text(
+                          'Browse all "This Day in History" records by date',
+                          style: TextStyle(
+                              color: AppColors.textSecondary, fontSize: 11),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Icon(Icons.chevron_right,
+                      color: AppColors.textMuted, size: 18),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
           const _SectionTitle('DATA SOURCES'),
           const SizedBox(height: 10),
           _Card(

@@ -89,14 +89,23 @@ class ForecastRepository {
       final effectiveDawn =
           dawn ?? date.add(const Duration(hours: 1, days: 1));
 
-      // Filter slots to dark hours for this night
+      // Floor dusk to the containing hour so the 20:00 slot is included
+      // when dusk is e.g. 20:07 (item 17 fix).
+      final duskHour = DateTime.utc(
+        effectiveDusk.year, effectiveDusk.month, effectiveDusk.day,
+        effectiveDusk.hour);
       final darkSlots = enrichedSlots.where((s) {
-        return !s.time.isBefore(effectiveDusk) &&
+        return !s.time.isBefore(duskHour) &&
             s.time.isBefore(effectiveDawn);
       }).toList();
 
       final moonPhase = _astronomy.moonPhase(date);
       final (moonRise, moonSet) = _astronomy.getMoonRiseSet(
+        lat: lat,
+        lon: lon,
+        forDate: date,
+      );
+      final (sunrise, sunset) = _astronomy.getSunriseSunset(
         lat: lat,
         lon: lon,
         forDate: date,
@@ -109,6 +118,8 @@ class ForecastRepository {
         moonPhase: moonPhase,
         moonRise: moonRise,
         moonSet: moonSet,
+        sunrise: sunrise,
+        sunset: sunset,
         darkHourSlots: darkSlots,
       ));
     }

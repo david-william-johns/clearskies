@@ -1,17 +1,12 @@
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
-import 'package:flutter_map/flutter_map.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:fl_chart/fl_chart.dart';
-import 'package:latlong2/latlong.dart';
 import '../../models/day_forecast.dart';
 import '../../models/hourly_slot.dart';
 import '../../models/location.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/night_weather_icon.dart';
 import 'clear_sky_score_badge.dart';
-import 'forecast_providers.dart';
 import 'hourly_conditions_grid.dart';
 
 class DayForecastTile extends StatefulWidget {
@@ -79,8 +74,7 @@ class _DayForecastTileState extends State<DayForecastTile> {
                 duration: const Duration(milliseconds: 350),
                 curve: Curves.easeInOutCubic,
                 child: _expanded
-                    ? _ExpandedBody(
-                        forecast: f, location: widget.location)
+                    ? _ExpandedBody(forecast: f)
                     : const SizedBox.shrink(),
               ),
             ),
@@ -177,7 +171,7 @@ class _CollapsedHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final f = forecast;
     final dayLabel = isToday
-        ? 'TODAY'
+        ? 'TONIGHT'
         : DateFormat('EEE').format(f.date.toLocal()).toUpperCase();
     final dateLabel = DateFormat('d MMM').format(f.date.toLocal());
     final duskStr = DateFormat('HH:mm').format(f.astronomicalDusk.toLocal());
@@ -349,9 +343,8 @@ class _WeatherChip extends StatelessWidget {
 
 class _ExpandedBody extends StatefulWidget {
   final DayForecast forecast;
-  final AppLocation location;
 
-  const _ExpandedBody({required this.forecast, required this.location});
+  const _ExpandedBody({required this.forecast});
 
   @override
   State<_ExpandedBody> createState() => _ExpandedBodyState();
@@ -359,6 +352,8 @@ class _ExpandedBody extends StatefulWidget {
 
 class _ExpandedBodyState extends State<_ExpandedBody> {
   int _selectedSlotIndex = 0;
+  bool _tempInFahrenheit = false;
+  bool _windInMph = false;
 
   @override
   Widget build(BuildContext context) {
@@ -370,35 +365,23 @@ class _ExpandedBodyState extends State<_ExpandedBody> {
         // Dark window summary
         Padding(
           padding: const EdgeInsets.fromLTRB(14, 10, 14, 4),
-          child: _DarkWindowSummary(forecast: f),
+          child: _DarkWindowSummary(
+            forecast: f,
+            tempInFahrenheit: _tempInFahrenheit,
+            windInMph: _windInMph,
+            onToggleTemp: () => setState(() => _tempInFahrenheit = !_tempInFahrenheit),
+            onToggleWind: () => setState(() => _windInMph = !_windInMph),
+          ),
         ),
-        // Hourly grid + weather map side by side
+        // Hourly grid (full width, natural height, max 220px scrollable)
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 14),
           child: SizedBox(
             height: 220,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Expanded(
-                  child: HourlyConditionsGrid(
-                    slots: f.darkHourSlots,
-                    selectedIndex: _selectedSlotIndex,
-                    onRowTap: (i) => setState(() => _selectedSlotIndex = i),
-                  ),
-                ),
-                if (f.darkHourSlots.isNotEmpty) ...[
-                  const SizedBox(width: 8),
-                  SizedBox(
-                    width: 210,
-                    child: _WeatherMapPanel(
-                      location: widget.location,
-                      slots: f.darkHourSlots,
-                      selectedIndex: _selectedSlotIndex,
-                    ),
-                  ),
-                ],
-              ],
+            child: HourlyConditionsGrid(
+              slots: f.darkHourSlots,
+              selectedIndex: _selectedSlotIndex,
+              onRowTap: (i) => setState(() => _selectedSlotIndex = i),
             ),
           ),
         ),
@@ -419,170 +402,22 @@ class _ExpandedBodyState extends State<_ExpandedBody> {
   }
 }
 
-// ─── Weather map panel ───────────────────────────────────────────────────────
-
-class _WeatherMapPanel extends ConsumerWidget {
-  final AppLocation location;
-  final List<HourlySlot> slots;
-  final int selectedIndex;
-
-  const _WeatherMapPanel({
-    required this.location,
-    required this.slots,
-    required this.selectedIndex,
-  });
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final center = LatLng(location.latitude, location.longitude);
-    final slot = slots[selectedIndex.clamp(0, slots.length - 1)];
-    final owmKey = ref.watch(owmApiKeyProvider).valueOrNull ?? '';
-
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(8),
-      child: Stack(
-        children: [
-          FlutterMap(
-            options: MapOptions(
-              initialCenter: center,
-              initialZoom: 9.0,
-            ),
-            children: [
-              TileLayer(
-                urlTemplate:
-                    'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-                userAgentPackageName: 'com.example.clearskies',
-              ),
-              if (owmKey.isNotEmpty)
-                TileLayer(
-                  urlTemplate:
-                      'https://tile.openweathermap.org/map/clouds_new/{z}/{x}/{y}.png?appid=$owmKey',
-                  userAgentPackageName: 'com.example.clearskies',
-                  opacity: 0.85,
-                ),
-              MarkerLayer(
-                markers: [
-                  Marker(
-                    point: center,
-                    width: 24,
-                    height: 24,
-                    child: const Icon(
-                      Icons.my_location,
-                      color: AppColors.primary,
-                      size: 20,
-                      shadows: [
-                        Shadow(color: Colors.black54, blurRadius: 4),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-          // Fallback cloud veil when no OWM key — opacity scales with forecast %
-          if (owmKey.isEmpty)
-            Positioned.fill(
-              child: IgnorePointer(
-                child: Container(
-                  color: Color(0xFF8FA8C0).withOpacity(
-                    (slot.cloudCoverTotal / 100.0) * 0.70,
-                  ),
-                ),
-              ),
-            ),
-          // Weather overlay card at the bottom
-          Positioned(
-            bottom: 6,
-            left: 6,
-            right: 6,
-            child: _MapOverlayCard(slot: slot),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _MapOverlayCard extends StatelessWidget {
-  final HourlySlot slot;
-  const _MapOverlayCard({required this.slot});
-
-  @override
-  Widget build(BuildContext context) {
-    final timeStr = DateFormat('HH:mm').format(slot.time.toLocal());
-    final windDir = slot.windDirectionDeg;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-      decoration: BoxDecoration(
-        color: AppColors.surface.withAlpha(215),
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: AppColors.surfaceBorder),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            '🕐 $timeStr',
-            style: const TextStyle(
-              color: AppColors.textPrimary,
-              fontSize: 9,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 3),
-          Wrap(
-            spacing: 6,
-            runSpacing: 2,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              _OverlayChip('☁ ${slot.cloudCoverTotal}%'),
-              _OverlayChip('🌡 ${slot.temperature.toStringAsFixed(0)}°C'),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _OverlayChip('💨 ${slot.windSpeedKnots.round()}kn'),
-                  if (windDir != null) ...[
-                    const SizedBox(width: 2),
-                    Transform.rotate(
-                      angle: windDir * math.pi / 180,
-                      child: const Icon(
-                        Icons.arrow_upward,
-                        size: 9,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-              _OverlayChip('💧 ${slot.precipitationProbability}%'),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _OverlayChip extends StatelessWidget {
-  final String text;
-  const _OverlayChip(this.text);
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      text,
-      style: const TextStyle(color: AppColors.textSecondary, fontSize: 8),
-    );
-  }
-}
-
 // ─── Dark window summary ─────────────────────────────────────────────────────
 
 class _DarkWindowSummary extends StatelessWidget {
   final DayForecast forecast;
-  const _DarkWindowSummary({required this.forecast});
+  final bool tempInFahrenheit;
+  final bool windInMph;
+  final VoidCallback onToggleTemp;
+  final VoidCallback onToggleWind;
+
+  const _DarkWindowSummary({
+    required this.forecast,
+    required this.tempInFahrenheit,
+    required this.windInMph,
+    required this.onToggleTemp,
+    required this.onToggleWind,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -594,50 +429,101 @@ class _DarkWindowSummary extends StatelessWidget {
     final avgSeeingStr =
         f.avgSeeing > 0 ? '${f.avgSeeing.toStringAsFixed(1)}/5' : 'N/A';
 
+    final tempValue = tempInFahrenheit
+        ? '${((f.avgTemperature * 9 / 5) + 32).toStringAsFixed(1)}°F'
+        : '${f.avgTemperature.toStringAsFixed(1)}°C';
+
+    final windValue = windInMph
+        ? '${(f.avgWindKmh * 0.621371).round()} mph'
+        : '${f.avgWindKmh.round()} km/h';
+
+    final sunriseStr = f.sunrise != null ? _fmt(f.sunrise!) : '--:--';
+    final sunsetStr = f.sunset != null ? _fmt(f.sunset!) : '--:--';
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Dark window time
-        _InfoChip(
-          icon: Icons.nightlight_outlined,
-          label: 'Dark window',
-          value: '$dusk – $dawn  ($h h ${m}m)',
+        // ── Dark window banner (item 12) ──────────────────────────────
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            color: AppColors.primary.withAlpha(20),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: AppColors.primary.withAlpha(60)),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.nightlight_outlined,
+                  size: 15, color: AppColors.primary),
+              const SizedBox(width: 8),
+              Text(
+                '$dusk → $dawn',
+                style: const TextStyle(
+                  color: AppColors.textPrimary,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                '· ${h}h ${m}m dark',
+                style: const TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
         ),
         const SizedBox(height: 10),
-        // Weather detail chips
+        // ── Weather detail chips (items 6–11) ────────────────────────
         Wrap(
           spacing: 10,
           runSpacing: 8,
           children: [
             _DetailChip(
               icon: Icons.cloud_outlined,
-              label: 'Cloud cover',
               value: '${f.bestCloudCover}%',
             ),
-            _DetailChip(
-              icon: Icons.thermostat,
-              label: 'Temperature',
-              value: '${f.avgTemperature.toStringAsFixed(1)}°C avg',
+            // Tappable temperature chip (item 9)
+            GestureDetector(
+              onTap: onToggleTemp,
+              child: _DetailChip(
+                icon: Icons.thermostat,
+                value: tempValue,
+                tappable: true,
+              ),
             ),
-            _DetailChip(
-              icon: Icons.air,
-              label: 'Wind',
-              value: '${f.avgWindKmh.round()} km/h avg',
+            // Tappable wind chip (item 10)
+            GestureDetector(
+              onTap: onToggleWind,
+              child: _DetailChip(
+                icon: Icons.air,
+                value: windValue,
+                tappable: true,
+              ),
             ),
             _DetailChip(
               icon: Icons.water_drop_outlined,
-              label: 'Precipitation',
-              value: '${f.maxPrecipPct}% max chance',
+              value: '${f.maxPrecipPct}%',
             ),
             _DetailChip(
               icon: Icons.opacity,
-              label: 'Humidity',
-              value: '${f.avgHumidity}% avg',
+              value: '${f.avgHumidity}%',
             ),
             _DetailChip(
               icon: Icons.remove_red_eye_outlined,
-              label: 'Seeing',
               value: avgSeeingStr,
+            ),
+            // Sunrise + sunset (item 11)
+            _DetailChip(
+              icon: Icons.wb_sunny_outlined,
+              value: sunriseStr,
+            ),
+            _DetailChip(
+              icon: Icons.wb_twilight,
+              value: sunsetStr,
             ),
           ],
         ),
@@ -648,75 +534,43 @@ class _DarkWindowSummary extends StatelessWidget {
   String _fmt(DateTime t) => DateFormat('HH:mm').format(t.toLocal());
 }
 
-class _InfoChip extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String value;
-  const _InfoChip(
-      {required this.icon, required this.label, required this.value});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 13, color: AppColors.textMuted),
-        const SizedBox(width: 4),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(label,
-                style: const TextStyle(
-                    color: AppColors.textMuted,
-                    fontSize: 9,
-                    letterSpacing: 0.5)),
-            Text(value,
-                style: const TextStyle(
-                    color: AppColors.textPrimary, fontSize: 12)),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-// Detailed chip used in expanded dark-window summary
+// Detailed chip used in expanded dark-window summary (icon + value only; item 6)
 class _DetailChip extends StatelessWidget {
   final IconData icon;
-  final String label;
   final String value;
+  // tappable chips get a subtle accent border to hint interactivity
+  final bool tappable;
   const _DetailChip(
-      {required this.icon, required this.label, required this.value});
+      {required this.icon, required this.value, this.tappable = false});
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       decoration: BoxDecoration(
-        color: AppColors.background.withAlpha(160),
+        color: tappable
+            ? AppColors.primary.withAlpha(15)
+            : AppColors.background.withAlpha(160),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.surfaceBorder),
+        border: Border.all(
+          color: tappable
+              ? AppColors.primary.withAlpha(60)
+              : AppColors.surfaceBorder,
+        ),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 13, color: AppColors.textMuted),
+          Icon(icon, size: 13,
+              color: tappable ? AppColors.primary : AppColors.textMuted),
           const SizedBox(width: 5),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(label,
-                  style: const TextStyle(
-                      color: AppColors.textMuted,
-                      fontSize: 9,
-                      letterSpacing: 0.3)),
-              Text(value,
-                  style: const TextStyle(
-                      color: AppColors.textPrimary,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600)),
-            ],
-          ),
+          Text(value,
+              style: TextStyle(
+                  color: tappable
+                      ? AppColors.textPrimary
+                      : AppColors.textPrimary,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600)),
         ],
       ),
     );

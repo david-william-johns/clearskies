@@ -60,8 +60,8 @@ class _HeaderRow extends StatelessWidget {
       children: [
         _Cell('TIME', flex: 2, header: true),
         _Cell('CLOUD', flex: 2, header: true),
-        _Cell('SEEING', flex: 2, header: true),
-        _Cell('TRANS', flex: 2, header: true),
+        _Cell('VISIBILITY', flex: 2, header: true),
+        _Cell('TRANSP', flex: 2, header: true),
         _Cell('HUM', flex: 1, header: true),
         _Cell('WIND', flex: 2, header: true),
         _Cell('SCORE', flex: 2, header: true),
@@ -105,15 +105,15 @@ class _SlotRow extends StatelessWidget {
               flex: 2,
               child: _CloudBar(pct: slot.cloudCoverTotal),
             ),
-            // Seeing dots
+            // Visibility (seeing) dots — RAG coloured
             Expanded(
               flex: 2,
-              child: _DotRating(value: slot.seeing, max: 5),
+              child: _DotRating(value: slot.seeing, max: 5, useRag: true),
             ),
-            // Transparency dots
+            // Transparency dots — RAG coloured
             Expanded(
               flex: 2,
-              child: _DotRating(value: slot.transparency, max: 5),
+              child: _DotRating(value: slot.transparency, max: 5, useRag: true),
             ),
             // Humidity
             _Cell(
@@ -123,7 +123,7 @@ class _SlotRow extends StatelessWidget {
             ),
             // Wind
             _Cell(
-              '${slot.windSpeedKnots.round()}kn',
+              '${slot.windSpeedKnots.round()} kn',
               flex: 2,
               color: slot.isWindy ? AppColors.scoreAmber : AppColors.textSecondary,
             ),
@@ -237,15 +237,24 @@ class _CloudBar extends StatelessWidget {
 class _DotRating extends StatelessWidget {
   final int value;
   final int max;
-  const _DotRating({required this.value, required this.max});
+  final bool useRag;
+  const _DotRating({required this.value, required this.max, this.useRag = false});
+
+  Color _filledColor() {
+    if (!useRag) return AppColors.primary;
+    if (value <= 2) return Colors.red.shade400;
+    if (value == 3) return Colors.amber.shade400;
+    return Colors.green.shade400;
+  }
 
   @override
   Widget build(BuildContext context) {
+    final filledColor = _filledColor();
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: List.generate(max, (i) {
         final filled = i < value;
-        final color = filled ? AppColors.primary : AppColors.surfaceBorder;
+        final color = filled ? filledColor : AppColors.surfaceBorder;
         return Container(
           width: 6,
           height: 6,

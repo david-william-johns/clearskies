@@ -7,6 +7,8 @@ class DayForecast {
   final double moonPhase; // 0.0 = new, 0.5 = full, 1.0 = new again
   final DateTime? moonRise;
   final DateTime? moonSet;
+  final DateTime? sunrise;
+  final DateTime? sunset;
 
   /// Only the hours that fall within the dark window (dusk → dawn).
   final List<HourlySlot> darkHourSlots;
@@ -18,6 +20,8 @@ class DayForecast {
     required this.moonPhase,
     required this.moonRise,
     required this.moonSet,
+    this.sunrise,
+    this.sunset,
     required this.darkHourSlots,
   });
 

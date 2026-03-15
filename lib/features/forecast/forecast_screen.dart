@@ -7,8 +7,10 @@ import '../../widgets/mini_calendar.dart';
 import '../../widgets/celestial_events_column.dart';
 import '../../widgets/history_panel.dart';
 import '../location/location_search_screen.dart';
+import 'current_conditions_panel.dart';
 import 'forecast_providers.dart';
 import 'day_forecast_tile.dart';
+import 'settings_screen.dart';
 
 class ForecastScreen extends ConsumerWidget {
   const ForecastScreen({super.key});
@@ -94,7 +96,10 @@ class _ForecastBody extends ConsumerWidget {
           IconButton(
             icon: const Icon(Icons.settings, color: AppColors.textSecondary),
             tooltip: 'Settings',
-            onPressed: null,
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const SettingsScreen()),
+            ),
           ),
         ],
       ),
@@ -116,9 +121,13 @@ class _ForecastBody extends ConsumerWidget {
             ),
           ),
 
-          // ── Centre panel: forecast tiles ─────────────────────────────────
+          // ── Centre panel: current conditions + forecast tiles ────────────
           Expanded(
-            child: forecastAsync.when(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                CurrentConditionsPanel(location: location),
+                Expanded(child: forecastAsync.when(
               loading: () => const Center(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -204,6 +213,8 @@ class _ForecastBody extends ConsumerWidget {
                   ),
                 );
               },
+            )),
+              ],
             ),
           ),
 
