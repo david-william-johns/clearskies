@@ -35,12 +35,19 @@ class HourlyConditionsGrid extends StatelessWidget {
         const SizedBox(height: 4),
         const Divider(height: 1),
         const SizedBox(height: 4),
-        // Data rows
-        ...slots.asMap().entries.map((e) => _SlotRow(
-              slot: e.value,
-              isSelected: e.key == selectedIndex,
-              onTap: () => onRowTap(e.key),
-            )),
+        // Data rows — scrollable so long nights don't overflow the 220px container
+        Flexible(
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: slots.asMap().entries.map((e) => _SlotRow(
+                    slot: e.value,
+                    isSelected: e.key == selectedIndex,
+                    onTap: () => onRowTap(e.key),
+                  )).toList(),
+            ),
+          ),
+        ),
       ],
     );
   }
