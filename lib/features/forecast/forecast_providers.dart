@@ -46,6 +46,13 @@ final forecastProvider =
   return repo.getForecast(lat: loc.latitude, lon: loc.longitude);
 });
 
+// ─── OWM API key provider ─────────────────────────────────────────────────────
+
+final owmApiKeyProvider = FutureProvider<String>((ref) async {
+  final prefs = await SharedPreferences.getInstance();
+  return prefs.getString('owm_api_key') ?? '';
+});
+
 // ─── Celestial events provider ───────────────────────────────────────────────
 
 final celestialEventsProvider =

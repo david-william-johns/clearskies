@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:latlong2/latlong.dart';
@@ -10,6 +11,7 @@ import '../../models/location.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/night_weather_icon.dart';
 import 'clear_sky_score_badge.dart';
+import 'forecast_providers.dart';
 import 'hourly_conditions_grid.dart';
 
 class DayForecastTile extends StatefulWidget {
@@ -419,7 +421,7 @@ class _ExpandedBodyState extends State<_ExpandedBody> {
 
 // ─── Weather map panel ───────────────────────────────────────────────────────
 
-class _WeatherMapPanel extends StatelessWidget {
+class _WeatherMapPanel extends ConsumerWidget {
   final AppLocation location;
   final List<HourlySlot> slots;
   final int selectedIndex;
@@ -431,9 +433,10 @@ class _WeatherMapPanel extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final center = LatLng(location.latitude, location.longitude);
     final slot = slots[selectedIndex.clamp(0, slots.length - 1)];
+    final owmKey = ref.watch(owmApiKeyProvider).valueOrNull ?? '';
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(8),
@@ -450,6 +453,13 @@ class _WeatherMapPanel extends StatelessWidget {
                     'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
                 userAgentPackageName: 'com.example.clearskies',
               ),
+              if (owmKey.isNotEmpty)
+                TileLayer(
+                  urlTemplate:
+                      'https://tile.openweathermap.org/map/clouds_new/{z}/{x}/{y}.png?appid=$owmKey',
+                  userAgentPackageName: 'com.example.clearskies',
+                  opacity: 0.85,
+                ),
               MarkerLayer(
                 markers: [
                   Marker(
@@ -469,6 +479,17 @@ class _WeatherMapPanel extends StatelessWidget {
               ),
             ],
           ),
+          // Fallback cloud veil when no OWM key — opacity scales with forecast %
+          if (owmKey.isEmpty)
+            Positioned.fill(
+              child: IgnorePointer(
+                child: Container(
+                  color: Color(0xFF8FA8C0).withOpacity(
+                    (slot.cloudCoverTotal / 100.0) * 0.70,
+                  ),
+                ),
+              ),
+            ),
           // Weather overlay card at the bottom
           Positioned(
             bottom: 6,

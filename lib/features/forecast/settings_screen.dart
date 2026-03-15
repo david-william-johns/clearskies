@@ -11,9 +11,13 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   static const _metOfficeKeyPref = 'met_office_api_key';
+  static const _owmKeyPref = 'owm_api_key';
   final _metOfficeController = TextEditingController();
+  final _owmController = TextEditingController();
   bool _obscure = true;
   bool _saved = false;
+  bool _owmObscure = true;
+  bool _owmSaved = false;
 
   @override
   void initState() {
@@ -23,8 +27,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<void> _load() async {
     final prefs = await SharedPreferences.getInstance();
-    final key = prefs.getString(_metOfficeKeyPref) ?? '';
-    setState(() => _metOfficeController.text = key);
+    final metKey = prefs.getString(_metOfficeKeyPref) ?? '';
+    final owmKey = prefs.getString(_owmKeyPref) ?? '';
+    setState(() {
+      _metOfficeController.text = metKey;
+      _owmController.text = owmKey;
+    });
   }
 
   Future<void> _save() async {
@@ -35,9 +43,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (mounted) setState(() => _saved = false);
   }
 
+  Future<void> _saveOwm() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_owmKeyPref, _owmController.text.trim());
+    setState(() => _owmSaved = true);
+    await Future.delayed(const Duration(seconds: 2));
+    if (mounted) setState(() => _owmSaved = false);
+  }
+
   @override
   void dispose() {
     _metOfficeController.dispose();
+    _owmController.dispose();
     super.dispose();
   }
 
@@ -157,6 +174,91 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           color: AppColors.textMuted, fontSize: 10),
                     ),
                   ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+          const _SectionTitle('MAP LAYERS'),
+          const SizedBox(height: 10),
+          _Card(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _SourceRow(
+                  icon: Icons.cloud_outlined,
+                  name: 'OpenWeatherMap Cloud Tiles',
+                  description:
+                      'Overlays real cloud pattern imagery on the satellite map — add your free API key to enable',
+                  status: _owmController.text.isEmpty ? 'No key' : 'Key saved',
+                  statusOk: _owmController.text.isNotEmpty,
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _owmController,
+                        obscureText: _owmObscure,
+                        style: const TextStyle(
+                            color: AppColors.textPrimary, fontSize: 13),
+                        decoration: InputDecoration(
+                          hintText: 'Paste API key…',
+                          hintStyle: const TextStyle(
+                              color: AppColors.textMuted, fontSize: 12),
+                          filled: true,
+                          fillColor: AppColors.background,
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 10),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: const BorderSide(
+                                color: AppColors.surfaceBorder),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: const BorderSide(
+                                color: AppColors.surfaceBorder),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide:
+                                const BorderSide(color: AppColors.primary),
+                          ),
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              _owmObscure
+                                  ? Icons.visibility_off_outlined
+                                  : Icons.visibility_outlined,
+                              color: AppColors.textMuted,
+                              size: 18,
+                            ),
+                            onPressed: () =>
+                                setState(() => _owmObscure = !_owmObscure),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    ElevatedButton(
+                      onPressed: _saveOwm,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: AppColors.background,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 10),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8)),
+                      ),
+                      child: Text(_owmSaved ? '✓ Saved' : 'Save'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  'Register free at openweathermap.org/api',
+                  style:
+                      TextStyle(color: AppColors.textMuted, fontSize: 10),
                 ),
               ],
             ),
