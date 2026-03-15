@@ -1,6 +1,5 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:intl/intl.dart';
 import 'package:fl_chart/fl_chart.dart';
@@ -49,6 +48,7 @@ class _DayForecastTileState extends State<DayForecastTile> {
 
     return GestureDetector(
       onTap: _toggle,
+      behavior: HitTestBehavior.opaque,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 250),
         margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
@@ -72,17 +72,15 @@ class _DayForecastTileState extends State<DayForecastTile> {
                 scoreColor: scoreColor,
                 isToday: isToday,
                 expanded: _expanded),
-            AnimatedCrossFade(
-              duration: const Duration(milliseconds: 350),
-              sizeCurve: Curves.easeInOutCubic,
-              crossFadeState: _expanded
-                  ? CrossFadeState.showSecond
-                  : CrossFadeState.showFirst,
-              firstChild: const SizedBox.shrink(),
-              secondChild: _ExpandedBody(
-                      forecast: f, location: widget.location)
-                  .animate()
-                  .fadeIn(duration: 300.ms, curve: Curves.easeIn),
+            ClipRect(
+              child: AnimatedSize(
+                duration: const Duration(milliseconds: 350),
+                curve: Curves.easeInOutCubic,
+                child: _expanded
+                    ? _ExpandedBody(
+                        forecast: f, location: widget.location)
+                    : const SizedBox.shrink(),
+              ),
             ),
           ],
         ),
@@ -375,7 +373,8 @@ class _ExpandedBodyState extends State<_ExpandedBody> {
         // Hourly grid + weather map side by side
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 14),
-          child: IntrinsicHeight(
+          child: SizedBox(
+            height: 220,
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [

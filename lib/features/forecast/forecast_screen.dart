@@ -1,6 +1,6 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import '../../models/location.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/mini_calendar.dart';
@@ -175,26 +175,32 @@ class _ForecastBody extends ConsumerWidget {
                       ref.invalidate(forecastProvider(location)),
                   color: AppColors.primary,
                   backgroundColor: AppColors.surface.withAlpha(200),
-                  child: ListView(
+                  child: ScrollConfiguration(
+                    // On Windows desktop the default ScrollBehavior includes
+                    // PointerDeviceKind.mouse in dragDevices, which causes the
+                    // list's scroll recognizer to win the gesture arena over
+                    // every GestureDetector.onTap inside the list.
+                    // Restrict drag-to-scroll to touch only; mouse-wheel
+                    // scrolling still works via PointerScrollEvent.
+                    behavior: ScrollConfiguration.of(context).copyWith(
+                      dragDevices: {PointerDeviceKind.touch},
+                    ),
+                    child: ListView(
                     physics: const AlwaysScrollableScrollPhysics(),
                     children: [
                       _LegendBar(),
                       const SizedBox(height: 4),
-                      ...forecasts.asMap().entries.map((e) {
-                        return DayForecastTile(
-                          key: ValueKey(e.value.date),
-                          forecast: e.value,
-                          location: location,
-                          initiallyExpanded: false,
-                        )
-                            .animate(delay: (e.key * 40).ms)
-                            .fadeIn(duration: 300.ms)
-                            .slideY(begin: 0.05, end: 0, duration: 300.ms);
-                      }),
+                      ...forecasts.map((f) => DayForecastTile(
+                            key: ValueKey(f.date),
+                            forecast: f,
+                            location: location,
+                            initiallyExpanded: false,
+                          )),
                       const SizedBox(height: 20),
                       const _Footer(),
                       const SizedBox(height: 8),
                     ],
+                  ),
                   ),
                 );
               },

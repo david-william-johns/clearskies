@@ -14,17 +14,19 @@ class CelestialEventsColumn extends StatelessWidget {
   Widget build(BuildContext context) {
     if (events.isEmpty) return const SizedBox.shrink();
 
-    // Collapse consecutive events with the same name into a single card
-    // (handles repeated per-night planet events like "Jupiter Visible" × 14)
-    final grouped = <({CelestialEvent event, int count})>[];
+    // Collapse all events with the same name into a single card,
+    // regardless of whether they are consecutive in the sorted list
+    // (handles repeated per-night planet events like "Jupiter Visible" × 42).
+    final nameMap = <String, ({CelestialEvent event, int count})>{};
     for (final e in events) {
-      if (grouped.isNotEmpty && grouped.last.event.name == e.name) {
-        final last = grouped.removeLast();
-        grouped.add((event: last.event, count: last.count + 1));
+      if (nameMap.containsKey(e.name)) {
+        nameMap[e.name] = (event: nameMap[e.name]!.event, count: nameMap[e.name]!.count + 1);
       } else {
-        grouped.add((event: e, count: 1));
+        nameMap[e.name] = (event: e, count: 1);
       }
     }
+    final grouped = nameMap.values.toList()
+      ..sort((a, b) => a.event.date.compareTo(b.event.date));
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -53,34 +55,44 @@ class CelestialEventsColumn extends StatelessWidget {
   }
 }
 
-Color planetColor(String eventName) {
-  if (eventName.startsWith('Mercury')) return const Color(0xFF9E9E9E);
-  if (eventName.startsWith('Venus'))   return const Color(0xFFFFF59D);
-  if (eventName.startsWith('Mars'))    return const Color(0xFFFF5252);
-  if (eventName.startsWith('Jupiter')) return const Color(0xFFFFB74D);
-  if (eventName.startsWith('Saturn'))  return const Color(0xFFFFD54F);
-  return AppColors.primary;
+/// Unified colour lookup for any [CelestialEvent] — used by both event tiles
+/// and the mini-calendar so colours stay in sync from a single source of truth.
+Color eventColor(CelestialEvent event) {
+  switch (event.type) {
+    case CelestialEventType.meteorShower:
+      return const Color(0xFF40C4FF); // sky blue
+    case CelestialEventType.aurora:
+      return const Color(0xFF69F0AE); // mint green
+    case CelestialEventType.moon:
+      return AppColors.moonGold;      // gold
+    case CelestialEventType.orbital:
+      return const Color(0xFF82B1FF); // periwinkle blue
+    case CelestialEventType.planet:
+      final n = event.name;
+      if (n.startsWith('Mercury')) return const Color(0xFF90A4AE); // steel-blue grey
+      if (n.startsWith('Venus'))   return const Color(0xFFFF80AB); // hot pink
+      if (n.startsWith('Mars'))    return const Color(0xFFEF5350); // vivid red
+      if (n.startsWith('Jupiter')) return const Color(0xFFFF8F00); // deep amber
+      if (n.startsWith('Saturn'))  return const Color(0xFFCE93D8); // lavender-purple
+      return AppColors.primary;
+  }
 }
+
+// Legacy alias kept so any future callers still compile.
+Color planetColor(String eventName) =>
+    eventColor(CelestialEvent(
+      type: CelestialEventType.planet,
+      name: eventName,
+      date: DateTime.now(),
+      description: '',
+    ));
 
 class _EventCard extends StatelessWidget {
   final CelestialEvent event;
   final int nightCount;
   const _EventCard({required this.event, this.nightCount = 1});
 
-  Color get _accentColor {
-    switch (event.type) {
-      case CelestialEventType.meteorShower:
-        return const Color(0xFFFFAB40);
-      case CelestialEventType.aurora:
-        return const Color(0xFF00E676);
-      case CelestialEventType.planet:
-        return planetColor(event.name);
-      case CelestialEventType.moon:
-        return AppColors.moonGold;
-      case CelestialEventType.orbital:
-        return AppColors.textSecondary;
-    }
-  }
+  Color get _accentColor => eventColor(event);
 
   IconData get _icon {
     switch (event.type) {

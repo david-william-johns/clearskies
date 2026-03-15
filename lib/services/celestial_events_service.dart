@@ -293,7 +293,7 @@ class CelestialEventsService {
     required double lon,
   }) async {
     final now = DateTime.now().toUtc();
-    final windowEnd = now.add(const Duration(days: 30));
+    final windowEnd = now.add(const Duration(days: 42)); // 6 weeks
 
     // Run API calls concurrently
     final results = await Future.wait([
