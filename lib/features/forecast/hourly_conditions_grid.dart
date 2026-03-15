@@ -5,8 +5,15 @@ import '../../theme/app_theme.dart';
 
 class HourlyConditionsGrid extends StatelessWidget {
   final List<HourlySlot> slots;
+  final int selectedIndex;
+  final void Function(int index) onRowTap;
 
-  const HourlyConditionsGrid({super.key, required this.slots});
+  const HourlyConditionsGrid({
+    super.key,
+    required this.slots,
+    this.selectedIndex = 0,
+    required this.onRowTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -29,7 +36,11 @@ class HourlyConditionsGrid extends StatelessWidget {
         const Divider(height: 1),
         const SizedBox(height: 4),
         // Data rows
-        ...slots.map((s) => _SlotRow(slot: s)),
+        ...slots.asMap().entries.map((e) => _SlotRow(
+              slot: e.value,
+              isSelected: e.key == selectedIndex,
+              onTap: () => onRowTap(e.key),
+            )),
       ],
     );
   }
@@ -54,7 +65,14 @@ class _HeaderRow extends StatelessWidget {
 
 class _SlotRow extends StatelessWidget {
   final HourlySlot slot;
-  const _SlotRow({required this.slot});
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _SlotRow({
+    required this.slot,
+    required this.isSelected,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -62,60 +80,68 @@ class _SlotRow extends StatelessWidget {
     final scoreColor = AppColors.scoreColor(score);
     final timeStr = DateFormat('HH:mm').format(slot.time.toLocal());
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 3),
-      child: Row(
-        children: [
-          // Time
-          _Cell(timeStr, flex: 2),
-          // Cloud cover bar
-          Expanded(
-            flex: 2,
-            child: _CloudBar(pct: slot.cloudCoverTotal),
-          ),
-          // Seeing dots
-          Expanded(
-            flex: 2,
-            child: _DotRating(value: slot.seeing, max: 5),
-          ),
-          // Transparency dots
-          Expanded(
-            flex: 2,
-            child: _DotRating(value: slot.transparency, max: 5),
-          ),
-          // Humidity
-          _Cell(
-            '${slot.humidity}%',
-            flex: 1,
-            color: slot.isDewRisk ? AppColors.scoreAmber : AppColors.textSecondary,
-          ),
-          // Wind
-          _Cell(
-            '${slot.windSpeedKnots.round()}kn',
-            flex: 2,
-            color: slot.isWindy ? AppColors.scoreAmber : AppColors.textSecondary,
-          ),
-          // Score
-          Expanded(
-            flex: 2,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-              decoration: BoxDecoration(
-                color: scoreColor.withAlpha(25),
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: Text(
-                '$score',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: scoreColor,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(4),
+      child: Container(
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.primary.withAlpha(25) : Colors.transparent,
+          borderRadius: BorderRadius.circular(4),
+        ),
+        padding: const EdgeInsets.symmetric(vertical: 3),
+        child: Row(
+          children: [
+            // Time
+            _Cell(timeStr, flex: 2),
+            // Cloud cover bar
+            Expanded(
+              flex: 2,
+              child: _CloudBar(pct: slot.cloudCoverTotal),
+            ),
+            // Seeing dots
+            Expanded(
+              flex: 2,
+              child: _DotRating(value: slot.seeing, max: 5),
+            ),
+            // Transparency dots
+            Expanded(
+              flex: 2,
+              child: _DotRating(value: slot.transparency, max: 5),
+            ),
+            // Humidity
+            _Cell(
+              '${slot.humidity}%',
+              flex: 1,
+              color: slot.isDewRisk ? AppColors.scoreAmber : AppColors.textSecondary,
+            ),
+            // Wind
+            _Cell(
+              '${slot.windSpeedKnots.round()}kn',
+              flex: 2,
+              color: slot.isWindy ? AppColors.scoreAmber : AppColors.textSecondary,
+            ),
+            // Score
+            Expanded(
+              flex: 2,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                decoration: BoxDecoration(
+                  color: scoreColor.withAlpha(25),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  '$score',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: scoreColor,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

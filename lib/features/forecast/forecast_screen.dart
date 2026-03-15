@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import '../../models/location.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/mini_calendar.dart';
 import '../../widgets/celestial_events_column.dart';
@@ -30,7 +31,7 @@ class ForecastScreen extends ConsumerWidget {
 }
 
 class _ForecastBody extends ConsumerWidget {
-  final dynamic location;
+  final AppLocation location;
   const _ForecastBody({required this.location});
 
   @override
@@ -180,10 +181,10 @@ class _ForecastBody extends ConsumerWidget {
                       _LegendBar(),
                       const SizedBox(height: 4),
                       ...forecasts.asMap().entries.map((e) {
-                        final isToday = e.key == 0;
                         return DayForecastTile(
                           key: ValueKey(e.value.date),
                           forecast: e.value,
+                          location: location,
                           initiallyExpanded: false,
                         )
                             .animate(delay: (e.key * 40).ms)

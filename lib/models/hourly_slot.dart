@@ -18,6 +18,9 @@ class HourlySlot {
   final int seeing; // 5=best, 1=worst
   final int transparency; // 5=best, 1=worst
 
+  // Wind direction (0–360°, 0=North, clockwise)
+  final double? windDirectionDeg;
+
   // Moon (calculated)
   final double moonAltitudeDeg;
 
@@ -35,6 +38,7 @@ class HourlySlot {
     required this.seeing,
     required this.transparency,
     required this.moonAltitudeDeg,
+    this.windDirectionDeg,
   });
 
   /// ClearSky score 0–100 for this hour.

@@ -38,6 +38,25 @@ class MiniCalendar extends StatelessWidget {
       eventColors.putIfAbsent(d, () => _eventColor(e));
     }
 
+    // Build map from date → tooltip name (first event per date wins)
+    final eventTooltips = <DateTime, String>{};
+    for (final e in allEvents) {
+      final d = DateTime(e.date.year, e.date.month, e.date.day);
+      eventTooltips.putIfAbsent(d, () => e.name);
+    }
+
+    // Determine which dates belong to multi-day events
+    // (events where the same name appears on more than one date)
+    final nameDates = <String, Set<DateTime>>{};
+    for (final e in allEvents) {
+      final d = DateTime(e.date.year, e.date.month, e.date.day);
+      nameDates.putIfAbsent(e.name, () => {}).add(d);
+    }
+    final multiDayDates = <DateTime>{};
+    for (final entry in nameDates.entries) {
+      if (entry.value.length > 1) multiDayDates.addAll(entry.value);
+    }
+
     // Next month
     final nextMonth = DateTime(now.year, now.month + 1, 1);
 
@@ -50,6 +69,8 @@ class MiniCalendar extends StatelessWidget {
           month: now.month,
           today: today,
           eventColors: eventColors,
+          eventTooltips: eventTooltips,
+          multiDayDates: multiDayDates,
         ),
         const SizedBox(height: 14),
         _MonthGrid(
@@ -57,6 +78,8 @@ class MiniCalendar extends StatelessWidget {
           month: nextMonth.month,
           today: today,
           eventColors: eventColors,
+          eventTooltips: eventTooltips,
+          multiDayDates: multiDayDates,
         ),
       ],
     );
@@ -70,12 +93,16 @@ class _MonthGrid extends StatelessWidget {
   final int month;
   final DateTime today;
   final Map<DateTime, Color> eventColors;
+  final Map<DateTime, String> eventTooltips;
+  final Set<DateTime> multiDayDates;
 
   const _MonthGrid({
     required this.year,
     required this.month,
     required this.today,
     required this.eventColors,
+    required this.eventTooltips,
+    required this.multiDayDates,
   });
 
   @override
@@ -104,6 +131,8 @@ class _MonthGrid extends StatelessWidget {
           month: month,
           today: today,
           eventColors: eventColors,
+          eventTooltips: eventTooltips,
+          multiDayDates: multiDayDates,
         ),
       ],
     );
@@ -144,12 +173,16 @@ class _DaysGrid extends StatelessWidget {
   final int month;
   final DateTime today;
   final Map<DateTime, Color> eventColors;
+  final Map<DateTime, String> eventTooltips;
+  final Set<DateTime> multiDayDates;
 
   const _DaysGrid({
     required this.year,
     required this.month,
     required this.today,
     required this.eventColors,
+    required this.eventTooltips,
+    required this.multiDayDates,
   });
 
   @override
@@ -177,6 +210,8 @@ class _DaysGrid extends StatelessWidget {
                 month: month,
                 today: today,
                 eventColors: eventColors,
+                eventTooltips: eventTooltips,
+                multiDayDates: multiDayDates,
               ))
           .toList(),
     );
@@ -189,6 +224,8 @@ class _WeekRow extends StatelessWidget {
   final int month;
   final DateTime today;
   final Map<DateTime, Color> eventColors;
+  final Map<DateTime, String> eventTooltips;
+  final Set<DateTime> multiDayDates;
 
   const _WeekRow({
     required this.week,
@@ -196,6 +233,8 @@ class _WeekRow extends StatelessWidget {
     required this.month,
     required this.today,
     required this.eventColors,
+    required this.eventTooltips,
+    required this.multiDayDates,
   });
 
   @override
@@ -208,9 +247,13 @@ class _WeekRow extends StatelessWidget {
         final date = DateTime(year, month, day);
         final isToday = date == today;
         final dotColor = eventColors[date];
+        final isMultiDay = dotColor != null && multiDayDates.contains(date);
+        final tooltipMsg = eventTooltips[date] ?? '';
 
         Widget dayCell;
+
         if (isToday) {
+          // Today: cyan circle, takes priority
           dayCell = Container(
             width: 18,
             height: 18,
@@ -229,7 +272,8 @@ class _WeekRow extends StatelessWidget {
               textAlign: TextAlign.center,
             ),
           );
-        } else if (dotColor != null) {
+        } else if (dotColor != null && !isMultiDay) {
+          // Single-day event: filled coloured circle with date in black
           dayCell = Container(
             width: 18,
             height: 18,
@@ -247,6 +291,31 @@ class _WeekRow extends StatelessWidget {
               ),
               textAlign: TextAlign.center,
             ),
+          );
+        } else if (dotColor != null && isMultiDay) {
+          // Multi-day event: small dot above the date number
+          dayCell = Column(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 5,
+                height: 5,
+                decoration: BoxDecoration(
+                  color: dotColor,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(height: 1),
+              Text(
+                '$day',
+                style: const TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: 9,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
           );
         } else {
           dayCell = SizedBox(
@@ -266,18 +335,12 @@ class _WeekRow extends StatelessWidget {
         Widget cell = SizedBox(
           width: 20,
           height: 22,
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.start,
-            children: [
-              dayCell,
-              const SizedBox(height: 4),
-            ],
-          ),
+          child: Center(child: dayCell),
         );
 
         if (dotColor != null) {
           cell = Tooltip(
-            message: 'Event',
+            message: tooltipMsg,
             child: cell,
           );
         }

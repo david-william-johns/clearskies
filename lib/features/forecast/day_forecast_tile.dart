@@ -1,9 +1,13 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:intl/intl.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:latlong2/latlong.dart';
 import '../../models/day_forecast.dart';
 import '../../models/hourly_slot.dart';
+import '../../models/location.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/night_weather_icon.dart';
 import 'clear_sky_score_badge.dart';
@@ -11,11 +15,13 @@ import 'hourly_conditions_grid.dart';
 
 class DayForecastTile extends StatefulWidget {
   final DayForecast forecast;
+  final AppLocation location;
   final bool initiallyExpanded;
 
   const DayForecastTile({
     super.key,
     required this.forecast,
+    required this.location,
     this.initiallyExpanded = false,
   });
 
@@ -73,7 +79,8 @@ class _DayForecastTileState extends State<DayForecastTile> {
                   ? CrossFadeState.showSecond
                   : CrossFadeState.showFirst,
               firstChild: const SizedBox.shrink(),
-              secondChild: _ExpandedBody(forecast: f)
+              secondChild: _ExpandedBody(
+                      forecast: f, location: widget.location)
                   .animate()
                   .fadeIn(duration: 300.ms, curve: Curves.easeIn),
             ),
@@ -340,13 +347,22 @@ class _WeatherChip extends StatelessWidget {
 
 // ─── Expanded body ───────────────────────────────────────────────────────────
 
-class _ExpandedBody extends StatelessWidget {
+class _ExpandedBody extends StatefulWidget {
   final DayForecast forecast;
-  const _ExpandedBody({required this.forecast});
+  final AppLocation location;
+
+  const _ExpandedBody({required this.forecast, required this.location});
+
+  @override
+  State<_ExpandedBody> createState() => _ExpandedBodyState();
+}
+
+class _ExpandedBodyState extends State<_ExpandedBody> {
+  int _selectedSlotIndex = 0;
 
   @override
   Widget build(BuildContext context) {
-    final f = forecast;
+    final f = widget.forecast;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -356,10 +372,34 @@ class _ExpandedBody extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(14, 10, 14, 4),
           child: _DarkWindowSummary(forecast: f),
         ),
-        // Hourly grid
+        // Hourly grid + weather map side by side
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 14),
-          child: HourlyConditionsGrid(slots: f.darkHourSlots),
+          child: IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(
+                  child: HourlyConditionsGrid(
+                    slots: f.darkHourSlots,
+                    selectedIndex: _selectedSlotIndex,
+                    onRowTap: (i) => setState(() => _selectedSlotIndex = i),
+                  ),
+                ),
+                if (f.darkHourSlots.isNotEmpty) ...[
+                  const SizedBox(width: 8),
+                  SizedBox(
+                    width: 210,
+                    child: _WeatherMapPanel(
+                      location: widget.location,
+                      slots: f.darkHourSlots,
+                      selectedIndex: _selectedSlotIndex,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
         ),
         const SizedBox(height: 12),
         // Cloud cover chart
@@ -377,6 +417,148 @@ class _ExpandedBody extends StatelessWidget {
     );
   }
 }
+
+// ─── Weather map panel ───────────────────────────────────────────────────────
+
+class _WeatherMapPanel extends StatelessWidget {
+  final AppLocation location;
+  final List<HourlySlot> slots;
+  final int selectedIndex;
+
+  const _WeatherMapPanel({
+    required this.location,
+    required this.slots,
+    required this.selectedIndex,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final center = LatLng(location.latitude, location.longitude);
+    final slot = slots[selectedIndex.clamp(0, slots.length - 1)];
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(8),
+      child: Stack(
+        children: [
+          FlutterMap(
+            options: MapOptions(
+              initialCenter: center,
+              initialZoom: 9.0,
+            ),
+            children: [
+              TileLayer(
+                urlTemplate:
+                    'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+                userAgentPackageName: 'com.example.clearskies',
+              ),
+              MarkerLayer(
+                markers: [
+                  Marker(
+                    point: center,
+                    width: 24,
+                    height: 24,
+                    child: const Icon(
+                      Icons.my_location,
+                      color: AppColors.primary,
+                      size: 20,
+                      shadows: [
+                        Shadow(color: Colors.black54, blurRadius: 4),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          // Weather overlay card at the bottom
+          Positioned(
+            bottom: 6,
+            left: 6,
+            right: 6,
+            child: _MapOverlayCard(slot: slot),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MapOverlayCard extends StatelessWidget {
+  final HourlySlot slot;
+  const _MapOverlayCard({required this.slot});
+
+  @override
+  Widget build(BuildContext context) {
+    final timeStr = DateFormat('HH:mm').format(slot.time.toLocal());
+    final windDir = slot.windDirectionDeg;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+      decoration: BoxDecoration(
+        color: AppColors.surface.withAlpha(215),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: AppColors.surfaceBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            '🕐 $timeStr',
+            style: const TextStyle(
+              color: AppColors.textPrimary,
+              fontSize: 9,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 3),
+          Wrap(
+            spacing: 6,
+            runSpacing: 2,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              _OverlayChip('☁ ${slot.cloudCoverTotal}%'),
+              _OverlayChip('🌡 ${slot.temperature.toStringAsFixed(0)}°C'),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _OverlayChip('💨 ${slot.windSpeedKnots.round()}kn'),
+                  if (windDir != null) ...[
+                    const SizedBox(width: 2),
+                    Transform.rotate(
+                      angle: windDir * math.pi / 180,
+                      child: const Icon(
+                        Icons.arrow_upward,
+                        size: 9,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+              _OverlayChip('💧 ${slot.precipitationProbability}%'),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _OverlayChip extends StatelessWidget {
+  final String text;
+  const _OverlayChip(this.text);
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      text,
+      style: const TextStyle(color: AppColors.textSecondary, fontSize: 8),
+    );
+  }
+}
+
+// ─── Dark window summary ─────────────────────────────────────────────────────
 
 class _DarkWindowSummary extends StatelessWidget {
   final DayForecast forecast;

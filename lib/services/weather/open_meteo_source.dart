@@ -40,6 +40,7 @@ class OpenMeteoSource implements WeatherDataSource {
           'cloudcover_high',
           'relativehumidity_2m',
           'windspeed_10m',
+          'winddirection_10m',
           'precipitation_probability',
           'dewpoint_2m',
           'temperature_2m',
@@ -58,6 +59,7 @@ class OpenMeteoSource implements WeatherDataSource {
     final ccHigh = (hourly['cloudcover_high'] as List).cast<num>();
     final rh = (hourly['relativehumidity_2m'] as List).cast<num>();
     final ws = (hourly['windspeed_10m'] as List).cast<num>();
+    final wd = (hourly['winddirection_10m'] as List?)?.cast<num>();
     final pp = (hourly['precipitation_probability'] as List?)?.cast<num>() ??
         List.filled(times.length, 0);
     final dp = (hourly['dewpoint_2m'] as List).cast<num>();
@@ -75,6 +77,7 @@ class OpenMeteoSource implements WeatherDataSource {
         cloudCoverHigh: (ccHigh[i]).round(),
         humidity: (rh[i]).round(),
         windSpeedKnots: (ws[i]).toDouble(),
+        windDirectionDeg: wd != null ? (wd[i]).toDouble() : null,
         precipitationProbability: (pp[i]).round(),
         dewPoint: (dp[i]).toDouble(),
         temperature: (temp[i]).toDouble(),
